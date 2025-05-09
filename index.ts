@@ -25,3 +25,8 @@ export { createErrorMap } from "./utils"
 export { createContract } from "./utils"
 export { createTransportAdapter } from "./transport-adapter"
 export { createMessageContext } from "./utils"
+
+// Export the Client and ClientStatus from client.ts
+export { Client, ClientStatus } from "./client"
+// Also export Client as MessagingClient for backward compatibility
+export { Client as MessagingClient } from "./client"

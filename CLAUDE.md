@@ -6,22 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build the library
-npm run build
+pnpm run build
 
 # Watch mode for development
-npm run dev
+pnpm run dev
 
 # Lint code
-npm run lint
+pnpm run lint
 
 # Type check without emitting files
-npm run typecheck
+pnpm run typecheck
 
 # Clean build artifacts
-npm run clean
+pnpm run clean
 ```
 
 ## Project Architecture
