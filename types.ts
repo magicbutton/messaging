@@ -1,7 +1,20 @@
 import type * as z from "zod"
 
-// Basic types for events and requests
+/**
+ * Type definition for event schemas used in contracts
+ * Maps event names to their Zod schema definitions
+ *
+ * @template T The Zod schema type
+ */
 export type EventSchemas = Record<string, z.ZodType>
+
+/**
+ * Type definition for request/response schemas used in contracts
+ * Maps request names to their request and response schema definitions
+ *
+ * @template TReq The request schema type
+ * @template TRes The response schema type
+ */
 export type RequestSchemas = Record<
   string,
   {
@@ -11,7 +24,18 @@ export type RequestSchemas = Record<
 >
 
 /**
- * Authentication result
+ * Authentication result interface representing the outcome of a login attempt
+ *
+ * @interface AuthResult
+ * @property {boolean} success - Whether the authentication was successful
+ * @property {string} [token] - Authentication token when successful
+ * @property {number} [expiresAt] - Timestamp when the token expires
+ * @property {Object} [user] - User information when authentication is successful
+ * @property {string} user.id - Unique identifier for the user
+ * @property {string} user.username - Username of the authenticated user
+ * @property {Object} [error] - Error information when authentication fails
+ * @property {string} error.code - Error code for the failure
+ * @property {string} error.message - Human-readable error message
  */
 export interface AuthResult {
   success: boolean
@@ -29,7 +53,15 @@ export interface AuthResult {
 }
 
 /**
- * Actor in the system
+ * Actor representation within the messaging system
+ * Used for authentication, authorization and tracking
+ *
+ * @interface Actor
+ * @property {string} id - Unique identifier for this actor
+ * @property {string} type - Type of actor (e.g., "user", "service", "system")
+ * @property {string[]} [roles] - Roles assigned to this actor for role-based access control
+ * @property {string[]} [permissions] - Direct permissions assigned to this actor
+ * @property {Record<string, any>} [metadata] - Additional metadata about the actor
  */
 export interface Actor {
   id: string
@@ -40,7 +72,20 @@ export interface Actor {
 }
 
 /**
- * Message context for requests and events
+ * Context information for messages, providing authentication, routing and tracing data
+ *
+ * @interface MessageContext
+ * @property {string} [id] - Unique identifier for this message context
+ * @property {number} [timestamp] - Time when the context was created
+ * @property {string} [source] - Identifier of the sender
+ * @property {string} [target] - Identifier of the intended recipient
+ * @property {Object} [auth] - Authentication information
+ * @property {string} [auth.token] - Authentication token
+ * @property {Actor} [auth.actor] - Actor information for the authenticated entity
+ * @property {Record<string, any>} [metadata] - Additional metadata for the message
+ * @property {string} [traceId] - Distributed tracing ID for cross-service tracking
+ * @property {string} [spanId] - Current span ID for the tracing context
+ * @property {string} [parentSpanId] - Parent span ID if this is a child operation
  */
 export interface MessageContext {
   id?: string

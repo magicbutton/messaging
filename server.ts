@@ -16,7 +16,15 @@ interface ClientConnection {
 }
 
 /**
- * Server options for configuring the server
+ * Configuration options for the messaging server
+ *
+ * @interface ServerOptions
+ * @property {string} [serverId] - Unique identifier for the server. If not provided, a UUID will be generated
+ * @property {string} [version] - Version of the server. Default: "1.0.0"
+ * @property {number} [heartbeatInterval] - Interval in milliseconds for sending heartbeat messages. Default: 30000
+ * @property {number} [clientTimeout] - Timeout in milliseconds after which clients are considered disconnected. Default: 90000 (3x heartbeat interval)
+ * @property {number} [maxClients] - Maximum number of clients that can connect to this server. Default: 1000
+ * @property {string[]} [capabilities] - List of capabilities supported by this server
  */
 export interface ServerOptions {
   serverId?: string
@@ -28,7 +36,18 @@ export interface ServerOptions {
 }
 
 /**
- * Server class that manages client connections
+ * Server class that manages client connections and message routing
+ *
+ * The Server is responsible for:
+ * - Managing client connections and their lifecycle
+ * - Routing messages between clients
+ * - Handling client registration and authentication
+ * - Processing requests and distributing events
+ * - Monitoring client health through heartbeats
+ *
+ * @class Server
+ * @template TEvents Type of events this server can handle, extended with system events
+ * @template TRequests Type of requests this server can process, extended with system requests
  */
 export class Server<TEvents extends Record<string, any> = {}, TRequests extends Record<string, any> = {}> {
   private adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>
@@ -41,9 +60,22 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     new Map()
 
   /**
-   * Create a new server
-   * @param adapter The transport adapter to use
-   * @param options Server options
+   * Creates a new messaging server instance
+   *
+   * @constructor
+   * @param {TransportAdapter<TEvents & systemEvents, TRequests & systemRequests>} adapter - The transport adapter to use for communication
+   * @param {ServerOptions} [options={}] - Configuration options for the server
+   * @example
+   * // Create a server with in-memory transport
+   * const transport = new InMemoryTransport();
+   * const server = new Server(transport, {
+   *   serverId: "main-message-server",
+   *   version: "2.0.0",
+   *   maxClients: 500
+   * });
+   *
+   * // Start the server
+   * await server.start("memory://my-server");
    */
   constructor(
     adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>,
@@ -264,8 +296,20 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
   }
 
   /**
-   * Start the server
-   * @param connectionString The connection string to use
+   * Starts the server with the specified connection string.
+   * Connects the transport adapter and begins listening for client connections.
+   * Also starts the heartbeat monitor to track client health.
+   *
+   * @async
+   * @param {string} connectionString - The connection string where the server will listen
+   * @returns {Promise<void>} A promise that resolves when the server has started
+   * @throws {Error} If the server fails to start or the transport adapter cannot connect
+   * @example
+   * // Start server on an in-memory transport
+   * await server.start("memory://message-hub");
+   *
+   * // Start server on a WebSocket transport
+   * await server.start("ws://0.0.0.0:8080/messaging");
    */
   async start(connectionString: string): Promise<void> {
     // Connect the transport adapter

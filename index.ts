@@ -1,6 +1,11 @@
 export * from "./types"
 export * from "./utils"
 export * from "./access-control"
+export * from "./versioned-schema"
+export * from "./observability"
+export * from "./middleware"
+export * from "./errors"
+export * from "./testing"
 export type {
   AuthResult,
   MessageContext,

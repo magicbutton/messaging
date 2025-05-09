@@ -3,7 +3,16 @@ import type { systemEvents, systemRequests } from "./system-contract"
 import { v4 as uuidv4 } from "uuid"
 
 /**
- * Client options for configuring the client
+ * Client options for configuring the messaging client
+ *
+ * @interface ClientOptions
+ * @property {string} [clientId] - Unique identifier for the client. If not provided, a UUID will be generated
+ * @property {string} [clientType] - Type of client, used for identification and filtering. Default: "generic"
+ * @property {boolean} [autoReconnect] - Whether to automatically reconnect when the connection is lost. Default: true
+ * @property {number} [reconnectInterval] - Interval in milliseconds between reconnection attempts. Default: 5000
+ * @property {number} [heartbeatInterval] - Interval in milliseconds for sending heartbeat messages. Default: 30000
+ * @property {string[]} [capabilities] - List of capabilities supported by this client
+ * @property {Record<string, unknown>} [metadata] - Additional metadata for the client
  */
 export interface ClientOptions {
   clientId?: string
@@ -16,7 +25,14 @@ export interface ClientOptions {
 }
 
 /**
- * Client status enum
+ * Enum representing the possible states of a messaging client
+ *
+ * @enum {string}
+ * @property {string} DISCONNECTED - Client is disconnected from the server
+ * @property {string} CONNECTING - Client is currently attempting to connect to the server
+ * @property {string} CONNECTED - Client is successfully connected to the server
+ * @property {string} RECONNECTING - Client lost connection and is attempting to reconnect
+ * @property {string} ERROR - Client encountered an error during connection or operation
  */
 export enum ClientStatus {
   DISCONNECTED = "disconnected",
@@ -27,7 +43,13 @@ export enum ClientStatus {
 }
 
 /**
- * Client class that uses a TransportAdapter to communicate with a server
+ * Client class that uses a TransportAdapter to communicate with a messaging server.
+ * Provides typed request/response communication and event subscription capabilities
+ * with automatic reconnection, heartbeats, and subscription management.
+ *
+ * @class Client
+ * @template TEvents Type of events this client can handle, extended with system events
+ * @template TRequests Type of requests this client can send, extended with system requests
  */
 export class Client<TEvents extends Record<string, any> = {}, TRequests extends Record<string, any> = {}> {
   private adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>
@@ -43,9 +65,22 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
   private errorListeners: Set<(error: Error) => void> = new Set()
 
   /**
-   * Create a new client
-   * @param adapter The transport adapter to use
-   * @param options Client options
+   * Creates a new messaging client instance
+   *
+   * @constructor
+   * @param {TransportAdapter<TEvents & systemEvents, TRequests & systemRequests>} adapter - The transport adapter to use for communication
+   * @param {ClientOptions} [options={}] - Configuration options for the client
+   * @example
+   * // Create a client with in-memory transport
+   * const transport = new InMemoryTransport();
+   * const client = new Client(transport, {
+   *   clientId: "frontend-client-1",
+   *   clientType: "frontend",
+   *   autoReconnect: true
+   * });
+   *
+   * // Connect to a server
+   * await client.connect("memory://my-server");
    */
   constructor(
     adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>,
@@ -89,8 +124,20 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
   }
 
   /**
-   * Connect to the server
-   * @param connectionString The connection string to use
+   * Connects the client to a messaging server using the provided connection string.
+   * Establishes a connection via the transport adapter, registers with the server,
+   * starts heartbeats, and restores any previous subscriptions.
+   *
+   * @async
+   * @param {string} connectionString - The connection string for the server
+   * @returns {Promise<void>} A promise that resolves when connected successfully
+   * @throws {Error} If connection fails or registration with the server fails
+   * @example
+   * // Connect to an in-memory server
+   * await client.connect("memory://message-server");
+   *
+   * // Connect to a WebSocket server
+   * await client.connect("ws://localhost:8080/messaging");
    */
   async connect(connectionString: string): Promise<void> {
     try {
