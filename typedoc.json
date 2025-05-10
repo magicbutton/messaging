@@ -1,0 +1,15 @@
+{
+  "entryPoints": ["index.ts"],
+  "out": "docs/api",
+  "name": "Magic Button Messaging",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "readme": "README.md",
+  "categorizeByGroup": true,
+  "sort": ["alphabetical"],
+  "navigationLinks": {
+    "GitHub": "https://github.com/magicbutton.cloud/messaging",
+    "Documentation": "https://code.magicbutton.cloud"
+  }
+}

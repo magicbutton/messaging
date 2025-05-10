@@ -1,23 +1,29 @@
 {
   "name": "@magicbutton.cloud/messaging",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "private": false,
   "files": [
-    "dist/**"
+    "dist/**",
+    "docs/**",
+    "USAGE.md",
+    "PROJECT_STRUCTURE.md"
   ],
   "scripts": {
-    "build": "tsup index.ts --format cjs,esm --dts --target=es2020",
+    "build": "tsup index.ts --format cjs,esm --dts --target=es2020 && npm run docs",
     "dev": "tsup index.ts --format cjs,esm --watch --dts --target=es2020",
     "lint": "eslint .",
-    "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
+    "clean": "rm -rf dist docs/api",
+    "typecheck": "tsc --noEmit",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "zod": "^3.22.4",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "zod": "^3.22.4"
   },
   "peerDependencies": {
     "react": "^18.2.0",
@@ -30,6 +36,7 @@
     "@types/uuid": "^9.0.0",
     "eslint": "^8.0.0",
     "tsup": "^8.0.1",
+    "typedoc": "^0.28.4",
     "typescript": "^5.0.0"
   },
   "publishConfig": {

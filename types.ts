@@ -103,7 +103,15 @@ export interface MessageContext {
 }
 
 /**
- * Event payload
+ * Event payload structure for message events
+ *
+ * Events are one-way messages that notify subscribers about something that happened.
+ * They include the event type, payload data, and optional context information.
+ *
+ * @template T - The type of the event payload data
+ * @property {string} type - The event type identifier
+ * @property {T} payload - The event payload data
+ * @property {MessageContext} [context] - Optional message context with metadata
  */
 export interface EventPayload<T = any> {
   type: string
@@ -112,7 +120,15 @@ export interface EventPayload<T = any> {
 }
 
 /**
- * Request payload
+ * Request payload structure for client-server requests
+ *
+ * Requests are messages sent from clients to servers expecting a response.
+ * They include the request type, payload data, and optional context information.
+ *
+ * @template T - The type of the request payload data
+ * @property {string} type - The request type identifier
+ * @property {T} payload - The request payload data
+ * @property {MessageContext} [context] - Optional message context with metadata
  */
 export interface RequestPayload<T = any> {
   type: string
@@ -121,7 +137,19 @@ export interface RequestPayload<T = any> {
 }
 
 /**
- * Response payload
+ * Response payload structure for server-client responses
+ *
+ * Responses are messages sent from servers back to clients in response to requests.
+ * They include a success flag, optional data or error information, and context.
+ *
+ * @template T - The type of the response data
+ * @property {boolean} success - Whether the request was successful
+ * @property {T} [data] - The response data (present when success is true)
+ * @property {Object} [error] - Error information (present when success is false)
+ * @property {string} error.code - Error code identifier
+ * @property {string} error.message - Human-readable error message
+ * @property {any} [error.details] - Additional error details
+ * @property {MessageContext} [context] - Optional message context with metadata
  */
 export interface ResponsePayload<T = any> {
   success: boolean

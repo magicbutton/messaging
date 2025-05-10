@@ -409,7 +409,18 @@ const context = createMessageContext({
 const orderDetails = await client.request("getOrderDetails", { orderId: "order-123" }, context)
 ```
 
-## API Reference
+## Documentation
+
+### API Reference
+
+The full API reference is included in the package:
+
+```bash
+# View the documentation after installing
+open node_modules/@magicbutton.cloud/messaging/docs/api/index.html
+```
+
+You can also view it online at [https://code.magicbutton.cloud](https://code.magicbutton.cloud)
 
 ### Core Functions
 
