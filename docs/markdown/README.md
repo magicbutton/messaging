@@ -1,4 +1,4 @@
-**Magic Button Messaging v1.1.1**
+**Magic Button Messaging v1.1.2**
 
 ***
 

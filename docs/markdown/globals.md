@@ -1,8 +1,8 @@
-[**Magic Button Messaging v1.1.1**](README.md)
+[**Magic Button Messaging v1.1.2**](README.md)
 
 ***
 
-# Magic Button Messaging v1.1.1
+# Magic Button Messaging v1.1.2
 
 ## Enumerations
 
