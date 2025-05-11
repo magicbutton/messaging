@@ -4,15 +4,24 @@ This directory contains starter prompts and examples to help you get started wit
 
 ## Contents
 
-- `CLAUDE.md`: A comprehensive prompt for Claude to help you bootstrap a chat application using in-memory transport
-- `chat-contract-example.ts`: Example implementation of a complete chat contract with events, requests, and permissions
-- `in-memory-transport-example.ts`: Example implementation of an in-memory transport adapter for testing
+- `chat-application/`: Ready-to-use starter prompt with example code for building a chat application
+  - `CLAUDE.md`: Comprehensive prompt with embedded example code for a chat application
+- `CLAUDE.md`: Basic prompt template for bootstrapping a chat application
+- `chat-contract-example.ts`: Example implementation of a complete chat contract
+- `in-memory-transport-example.ts`: Example implementation of an in-memory transport adapter
 
 ## Using the Starter Prompts
 
 ### 1. Creating a New Chat Application
 
-Use the prompt in `CLAUDE.md` to ask Claude to help you create a complete chat application using the Magic Button Messaging library. This prompt will guide Claude to create:
+For a complete and comprehensive approach, use the prompt in `chat-application/CLAUDE.md` which includes:
+
+- Detailed prompt template
+- Complete example code for the chat contract
+- Complete example code for the in-memory transport
+- Development guidelines and workflow
+
+Alternatively, you can use the basic prompt in the root `CLAUDE.md` to ask Claude to help you create a chat application from scratch. Both prompts will guide Claude to create:
 
 - Contract definitions
 - In-memory transport
