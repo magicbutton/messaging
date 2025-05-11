@@ -6,13 +6,12 @@ This directory contains starter prompts and examples to help you get started wit
 
 - `chat-application/`: Ready-to-use starter prompt with example code for building a chat application
   - `CLAUDE.md`: Comprehensive prompt with embedded example code for a chat application
-- `CLAUDE.md`: Basic prompt template for bootstrapping a chat application
-- `chat-contract-example.ts`: Example implementation of a complete chat contract
-- `in-memory-transport-example.ts`: Example implementation of an in-memory transport adapter
+- `react-chat-app/`: Starter prompt for building a modern React-based chat application
+  - `CLAUDE.md`: Comprehensive prompt with React components, hooks, and context implementation
 
 ## Using the Starter Prompts
 
-### 1. Creating a New Chat Application
+### 1. Creating a Basic Chat Application
 
 For a complete and comprehensive approach, use the prompt in `chat-application/CLAUDE.md` which includes:
 
@@ -21,44 +20,32 @@ For a complete and comprehensive approach, use the prompt in `chat-application/C
 - Complete example code for the in-memory transport
 - Development guidelines and workflow
 
-Alternatively, you can use the basic prompt in the root `CLAUDE.md` to ask Claude to help you create a chat application from scratch. Both prompts will guide Claude to create:
+### 2. Creating a React Chat Application
 
-- Contract definitions
-- In-memory transport
-- Server implementation
-- Client implementation
+Use the prompt in `react-chat-app/CLAUDE.md` to build a modern React chat application with:
 
-### 2. Understanding the Contract Pattern
+- React (latest version) with TypeScript
+- Context API for state management
+- Custom hooks for messaging functionality
+- Complete UI components
+- Real-time messaging with typing indicators and presence
 
-Review the `chat-contract-example.ts` file to understand how to structure your contracts with:
+## Key Concepts
 
-- Zod schemas for type safety
-- Event definitions with access controls
-- Request/response definitions with permissions
-- Error definitions and role-based permissions
+When implementing your chat application, keep these messaging library concepts in mind:
 
-### 3. Implementing In-Memory Transport
-
-The `in-memory-transport-example.ts` file shows a complete implementation of an in-memory transport adapter that:
-
-- Works across multiple clients and servers
-- Handles system events and requests
-- Supports the full transport interface
-
-## Integration with Magic Button Messaging
-
-These examples are designed to work with version 1.0.10 of the Magic Button Messaging library. Make sure to install the correct version:
-
-```bash
-npm install @magicbutton.cloud/messaging@1.0.10
-```
+1. **Contract-First Design**: Define all events, requests, and permissions in your contract
+2. **Transport Abstraction**: The in-memory transport allows for testing without network dependencies
+3. **Role-Based Access Control**: Define different permissions for admins, moderators, and users
+4. **Message Context**: Use message context to pass authentication and metadata
+5. **Middleware**: Add middleware for logging, validation, and authentication
+6. **Error Handling**: Use the error registry for standardized error handling
 
 ## Next Steps
 
-After creating your initial application using these starter prompts:
+After implementing the basic chat application with in-memory transport, you can:
 
-1. Add proper error handling
-2. Implement authentication and authorization
-3. Add persistent storage for messages and user data
-4. Create a UI for your chat application
-5. Consider implementing a network transport for real-world usage
+1. Add a real transport implementation (WebSocket, HTTP, etc.)
+2. Implement persistence with a database
+3. Create a proper UI for the chat
+4. Add additional features like file sharing, reactions, etc.
