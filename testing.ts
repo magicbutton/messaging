@@ -1,7 +1,7 @@
 import { InMemoryTransport } from "./in-memory-transport"
-import { Client } from "./client"
-import { Server } from "./server"
-import type { TransportAdapter, MessageContext, EventPayload, RequestPayload, ResponsePayload } from "./types"
+import { MessagingClient } from "./client"
+import { MessagingServer } from "./server"
+import type { Transport, MessageContext, EventPayload, RequestPayload, ResponsePayload } from "./types"
 import { createMessageContext } from "./utils"
 import { getObservabilityProvider } from "./observability"
 
@@ -49,7 +49,7 @@ export interface MockTransportOptions {
  * Captures events and requests for inspection in tests
  */
 export class MockTransport<TEvents extends Record<string, any> = {}, TRequests extends Record<string, any> = {}>
-  implements TransportAdapter<TEvents, TRequests>
+  implements Transport<any>
 {
   private connected = false
   private connectionString = ""
@@ -416,7 +416,7 @@ export interface TestMessagingOptions {
   /**
    * Transport to use (defaults to MockTransport)
    */
-  transport?: TransportAdapter<any, any>
+  transport?: Transport<any>
   
   /**
    * Server options
@@ -476,17 +476,17 @@ export class TestMessaging<TEvents extends Record<string, any> = {}, TRequests e
   /**
    * The mock transport adapter
    */
-  readonly transport: TransportAdapter<TEvents, TRequests>
-  
+  readonly transport: Transport<any>
+
   /**
    * The server instance
    */
-  readonly server: Server<TEvents, TRequests>
-  
+  readonly server: MessagingServer<any>
+
   /**
    * The client instance
    */
-  readonly client: Client<TEvents, TRequests>
+  readonly client: MessagingClient<any>
   
   /**
    * The connection string
@@ -501,15 +501,15 @@ export class TestMessaging<TEvents extends Record<string, any> = {}, TRequests e
     this.transport = options.transport || new MockTransport<TEvents, TRequests>()
     
     // Create server
-    this.server = new Server<TEvents, TRequests>(this.transport as any, {
+    this.server = new MessagingServer<any>(this.transport, {
       serverId: serverOpts.serverId || "test-server",
       capabilities: serverOpts.capabilities,
       heartbeatInterval: 1000, // More frequent for tests
       clientTimeout: 3000
     })
-    
+
     // Create client
-    this.client = new Client<TEvents, TRequests>(this.transport as any, {
+    this.client = new MessagingClient<any>(this.transport, {
       clientId: clientOpts.clientId || "test-client",
       clientType: clientOpts.clientType || "test",
       capabilities: clientOpts.capabilities,

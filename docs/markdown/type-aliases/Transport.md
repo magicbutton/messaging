@@ -1,0 +1,13 @@
+[**Magic Button Messaging v1.1.1**](../README.md)
+
+***
+
+# Type Alias: Transport\<TContract\>
+
+> **Transport**\<`TContract`\> = [`ITransport`](../interfaces/ITransport.md)\<`TContract`\>
+
+## Type Parameters
+
+### TContract
+
+`TContract` *extends* [`IContract`](../interfaces/IContract.md) = [`IContract`](../interfaces/IContract.md)

@@ -11,5 +11,9 @@
   "navigationLinks": {
     "GitHub": "https://github.com/magicbutton.cloud/messaging",
     "Documentation": "https://code.magicbutton.cloud"
-  }
+  },
+  "plugin": ["typedoc-plugin-markdown"],
+  "theme": "default",
+  "disableSources": true,
+  "hideBreadcrumbs": true
 }

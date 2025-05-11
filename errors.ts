@@ -1,694 +1,282 @@
-import { getObservabilityProvider } from "./observability"
+import { Contract, ErrorDefinition, ErrorSeverity } from "./types"
 
 /**
- * Error code types
+ * Error types for categorizing system errors
  */
 export enum ErrorType {
-  // System errors
-  SYSTEM = "system",
-  TRANSPORT = "transport",
+  VALIDATION = "validation",
+  AUTHENTICATION = "authentication",
+  AUTHORIZATION = "authorization",
   CONNECTION = "connection",
   TIMEOUT = "timeout",
-  
-  // Validation errors
-  VALIDATION = "validation",
-  SCHEMA = "schema",
-  
-  // Authorization errors
-  AUTH = "auth",
-  PERMISSION = "permission",
-  
-  // Request/response errors
-  REQUEST = "request",
-  RESPONSE = "response",
-  
-  // State errors
-  STATE = "state",
-  
-  // Business logic errors
-  BUSINESS = "business",
-  
-  // Unknown errors
-  UNKNOWN = "unknown"
+  NOT_FOUND = "not_found",
+  CONFLICT = "conflict",
+  SERVER = "server",
+  CLIENT = "client",
+  UNEXPECTED = "unexpected"
 }
 
 /**
- * Error severity levels
- */
-export enum ErrorSeverity {
-  // Informational, operation can continue
-  INFO = "info",
-  
-  // Warning, operation can continue but might have issues
-  WARNING = "warning",
-  
-  // Error, operation failed but system can continue
-  ERROR = "error",
-  
-  // Critical, system might be in an unstable state
-  CRITICAL = "critical",
-  
-  // Fatal, system cannot continue
-  FATAL = "fatal"
-}
-
-/**
- * Error metadata
- */
-export interface ErrorMetadata {
-  // Error type
-  type: ErrorType
-  
-  // Error severity
-  severity: ErrorSeverity
-  
-  // HTTP status code equivalent (useful for REST transport)
-  statusCode?: number
-  
-  // Retry information
-  retry?: {
-    // Whether the operation can be retried
-    retryable: boolean
-    
-    // Suggested delay before retry in milliseconds
-    delayMs?: number
-    
-    // Maximum number of retries suggested
-    maxRetries?: number
-  }
-  
-  // Additional metadata
-  [key: string]: any
-}
-
-/**
- * Error code definition
- */
-export interface ErrorDefinition {
-  // Error code (e.g., "connection_failed")
-  code: string
-  
-  // Human-readable error message template
-  message: string
-  
-  // Error metadata
-  metadata: ErrorMetadata
-}
-
-/**
- * Messaging error class
+ * Messaging error that includes error code and metadata
  */
 export class MessagingError extends Error {
   readonly code: string
-  readonly metadata: ErrorMetadata
-  readonly details?: any
-  readonly cause?: Error
-  readonly timestamp: number
-  
+  readonly severity: ErrorSeverity
+  readonly type: ErrorType
+  readonly retryable: boolean
+  readonly metadata: Record<string, unknown>
+
   constructor(
-    definition: ErrorDefinition,
-    options: {
-      // Error details specific to this instance
-      details?: any,
-      
-      // Error that caused this error
-      cause?: Error,
-      
-      // Parameters for message template
-      params?: Record<string, string | number | boolean>
-    } = {}
+    message: string,
+    code: string,
+    severity: ErrorSeverity = ErrorSeverity.ERROR,
+    type: ErrorType = ErrorType.UNEXPECTED,
+    retryable: boolean = false,
+    metadata: Record<string, unknown> = {}
   ) {
-    // Format message with parameters if provided
-    const message = options.params
-      ? formatMessage(definition.message, options.params)
-      : definition.message
-    
     super(message)
-    
     this.name = "MessagingError"
-    this.code = definition.code
-    this.metadata = definition.metadata
-    this.details = options.details
-    this.cause = options.cause
-    this.timestamp = Date.now()
-    
-    // Capture stack trace
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, MessagingError)
-    }
-    
-    // Log error automatically
-    this.logError()
+    this.code = code
+    this.severity = severity
+    this.type = type
+    this.retryable = retryable
+    this.metadata = metadata
   }
-  
+
   /**
-   * Log the error using the observability provider
+   * Convert the error to a plain object for serialization
    */
-  private logError(): void {
-    const logger = getObservabilityProvider().getLogger("errors")
-    
-    // Determine log level based on severity
-    switch (this.metadata.severity) {
-      case ErrorSeverity.INFO:
-        logger.info(`${this.code}: ${this.message}`, { 
-          error: this.toJSON() 
-        })
-        break
-      case ErrorSeverity.WARNING:
-        logger.warn(`${this.code}: ${this.message}`, { 
-          error: this.toJSON() 
-        })
-        break
-      case ErrorSeverity.ERROR:
-      case ErrorSeverity.CRITICAL:
-      case ErrorSeverity.FATAL:
-        logger.error(`${this.code}: ${this.message}`, this, { 
-          error: this.toJSON() 
-        })
-        break
-    }
-  }
-  
-  /**
-   * Convert to a plain object for serialization
-   */
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       name: this.name,
-      code: this.code,
       message: this.message,
+      code: this.code,
+      severity: this.severity,
+      type: this.type,
+      retryable: this.retryable,
       metadata: this.metadata,
-      details: this.details,
-      timestamp: this.timestamp,
-      stack: this.stack,
-      cause: this.cause instanceof Error 
-        ? {
-            name: this.cause.name,
-            message: this.cause.message,
-            stack: this.cause.stack
-          }
-        : this.cause
+      stack: this.stack
     }
-  }
-  
-  /**
-   * Convert to a response error format
-   */
-  toResponseError(): {
-    code: string
-    message: string
-    details?: any
-  } {
-    return {
-      code: this.code,
-      message: this.message,
-      details: this.details
-    }
-  }
-  
-  /**
-   * Check if error is of a specific type
-   */
-  isType(type: ErrorType): boolean {
-    return this.metadata.type === type
-  }
-  
-  /**
-   * Check if error has at least the specified severity
-   */
-  hasSeverity(severity: ErrorSeverity): boolean {
-    const severities = [
-      ErrorSeverity.INFO,
-      ErrorSeverity.WARNING,
-      ErrorSeverity.ERROR,
-      ErrorSeverity.CRITICAL,
-      ErrorSeverity.FATAL
-    ]
-    
-    const currentIndex = severities.indexOf(this.metadata.severity)
-    const requiredIndex = severities.indexOf(severity)
-    
-    return currentIndex >= requiredIndex
-  }
-  
-  /**
-   * Check if error is retryable
-   */
-  isRetryable(): boolean {
-    return this.metadata.retry?.retryable === true
-  }
-  
-  /**
-   * Get suggested retry delay
-   */
-  getRetryDelay(): number {
-    return this.metadata.retry?.delayMs || 1000
-  }
-  
-  /**
-   * Get maximum retries
-   */
-  getMaxRetries(): number {
-    return this.metadata.retry?.maxRetries || 3
   }
 }
 
 /**
- * Error registry for managing error definitions
+ * Error registry that stores error definitions and allows creating error instances
  */
-export class ErrorRegistry {
-  private errors: Map<string, ErrorDefinition> = new Map()
+export class ErrorRegistry<TContract extends Contract> {
+  private errorDefinitions: Map<string, ErrorDefinition> = new Map()
+  
+  /**
+   * Create a new error registry with predefined system errors and contract errors
+   */
+  constructor(contract: TContract) {
+    // Register system errors
+    this.registerSystemErrors()
+    
+    // Register contract errors
+    this.registerContractErrors(contract)
+  }
+  
+  /**
+   * Register system error definitions
+   */
+  private registerSystemErrors(): void {
+    this.register({
+      code: "system.validation_error",
+      message: "Validation error",
+      severity: ErrorSeverity.ERROR,
+      retryable: false
+    })
+    
+    this.register({
+      code: "system.authentication_error",
+      message: "Authentication error",
+      severity: ErrorSeverity.ERROR,
+      retryable: true
+    })
+    
+    this.register({
+      code: "system.authorization_error",
+      message: "Authorization error",
+      severity: ErrorSeverity.ERROR,
+      retryable: false
+    })
+    
+    this.register({
+      code: "system.connection_error",
+      message: "Connection error",
+      severity: ErrorSeverity.ERROR,
+      retryable: true
+    })
+    
+    this.register({
+      code: "system.timeout_error",
+      message: "Timeout error",
+      severity: ErrorSeverity.WARNING,
+      retryable: true
+    })
+    
+    this.register({
+      code: "system.not_found_error",
+      message: "Resource not found",
+      severity: ErrorSeverity.ERROR,
+      retryable: false
+    })
+    
+    this.register({
+      code: "system.conflict_error",
+      message: "Resource conflict",
+      severity: ErrorSeverity.ERROR,
+      retryable: false
+    })
+    
+    this.register({
+      code: "system.server_error",
+      message: "Server error",
+      severity: ErrorSeverity.ERROR,
+      retryable: true
+    })
+    
+    this.register({
+      code: "system.client_error",
+      message: "Client error",
+      severity: ErrorSeverity.ERROR,
+      retryable: false
+    })
+    
+    this.register({
+      code: "system.unexpected_error",
+      message: "Unexpected error",
+      severity: ErrorSeverity.CRITICAL,
+      retryable: false
+    })
+  }
+  
+  /**
+   * Register contract error definitions
+   */
+  private registerContractErrors(contract: TContract): void {
+    Object.entries(contract.errors).forEach(([code, definition]) => {
+      this.register(definition)
+    })
+  }
   
   /**
    * Register an error definition
    */
-  register(definition: ErrorDefinition): this {
-    if (this.errors.has(definition.code)) {
-      console.warn(`Error code '${definition.code}' is already registered and will be overwritten`)
-    }
-    
-    this.errors.set(definition.code, definition)
-    return this
+  register(definition: ErrorDefinition): void {
+    this.errorDefinitions.set(definition.code, definition)
   }
   
   /**
-   * Register multiple error definitions
+   * Create an error instance from an error code
+   * @param code The error code
+   * @param message Optional custom message (overrides the default)
+   * @param metadata Optional metadata to attach to the error
    */
-  registerMany(definitions: ErrorDefinition[]): this {
-    for (const definition of definitions) {
-      this.register(definition)
-    }
-    return this
-  }
-  
-  /**
-   * Get an error definition by code
-   */
-  getDefinition(code: string): ErrorDefinition | undefined {
-    return this.errors.get(code)
-  }
-  
-  /**
-   * Create an error instance from a registered error code
-   */
-  createError(
-    code: string,
-    options: {
-      details?: any,
-      cause?: Error,
-      params?: Record<string, string | number | boolean>
-    } = {}
-  ): MessagingError {
-    const definition = this.errors.get(code)
+  createError(code: string, message?: string, metadata: Record<string, unknown> = {}): MessagingError {
+    const definition = this.errorDefinitions.get(code)
     
     if (!definition) {
-      // Create a generic error if the code is not registered
-      return new MessagingError({
-        code: "unknown_error",
-        message: `Unknown error code: ${code}`,
-        metadata: {
-          type: ErrorType.UNKNOWN,
-          severity: ErrorSeverity.ERROR
-        }
-      }, {
-        details: {
-          requestedCode: code,
-          ...options.details
-        },
-        cause: options.cause
-      })
+      return new MessagingError(
+        message || `Unknown error: ${code}`,
+        code,
+        ErrorSeverity.ERROR,
+        ErrorType.UNEXPECTED,
+        false,
+        metadata
+      )
     }
     
-    return new MessagingError(definition, options)
+    return new MessagingError(
+      message || definition.message,
+      definition.code,
+      definition.severity,
+      this.mapErrorType(definition.code),
+      definition.retryable || false,
+      { ...definition.metadata, ...metadata }
+    )
   }
   
   /**
-   * Get all registered error codes
+   * Map error code to error type
    */
-  getAllCodes(): string[] {
-    return Array.from(this.errors.keys())
-  }
-}
-
-// Create a global error registry
-const globalErrorRegistry = new ErrorRegistry()
-
-/**
- * Get the global error registry
- */
-export function getErrorRegistry(): ErrorRegistry {
-  return globalErrorRegistry
-}
-
-/**
- * Register system errors
- */
-export function registerSystemErrors(registry: ErrorRegistry = globalErrorRegistry): ErrorRegistry {
-  return registry.registerMany([
-    // Connection errors
-    {
-      code: "connection_failed",
-      message: "Failed to establish connection to {target}",
-      metadata: {
-        type: ErrorType.CONNECTION,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 503,
-        retry: {
-          retryable: true,
-          delayMs: 1000,
-          maxRetries: 5
-        }
-      }
-    },
-    {
-      code: "connection_timeout",
-      message: "Connection to {target} timed out after {timeoutMs}ms",
-      metadata: {
-        type: ErrorType.TIMEOUT,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 504,
-        retry: {
-          retryable: true,
-          delayMs: 2000,
-          maxRetries: 3
-        }
-      }
-    },
-    {
-      code: "connection_closed",
-      message: "Connection was closed unexpectedly",
-      metadata: {
-        type: ErrorType.CONNECTION,
-        severity: ErrorSeverity.WARNING,
-        statusCode: 500,
-        retry: {
-          retryable: true,
-          delayMs: 1000,
-          maxRetries: 3
-        }
-      }
-    },
-    
-    // Transport errors
-    {
-      code: "transport_error",
-      message: "Transport error: {details}",
-      metadata: {
-        type: ErrorType.TRANSPORT,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 500,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    {
-      code: "transport_not_supported",
-      message: "Transport {transport} is not supported",
-      metadata: {
-        type: ErrorType.TRANSPORT,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 400,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    
-    // Request/response errors
-    {
-      code: "request_timeout",
-      message: "Request {requestId} timed out after {timeoutMs}ms",
-      metadata: {
-        type: ErrorType.TIMEOUT,
-        severity: ErrorSeverity.WARNING,
-        statusCode: 504,
-        retry: {
-          retryable: true,
-          delayMs: 2000,
-          maxRetries: 2
-        }
-      }
-    },
-    {
-      code: "request_failed",
-      message: "Request {requestType} failed: {reason}",
-      metadata: {
-        type: ErrorType.REQUEST,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 500,
-        retry: {
-          retryable: true,
-          delayMs: 1000,
-          maxRetries: 3
-        }
-      }
-    },
-    {
-      code: "invalid_response",
-      message: "Received invalid response from {source}",
-      metadata: {
-        type: ErrorType.RESPONSE,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 502,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    
-    // Validation errors
-    {
-      code: "schema_validation_failed",
-      message: "Schema validation failed for {schemaType}",
-      metadata: {
-        type: ErrorType.VALIDATION,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 400,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    {
-      code: "invalid_message_format",
-      message: "Invalid message format",
-      metadata: {
-        type: ErrorType.VALIDATION,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 400,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    
-    // Authentication errors
-    {
-      code: "authentication_failed",
-      message: "Authentication failed",
-      metadata: {
-        type: ErrorType.AUTH,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 401,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    {
-      code: "token_expired",
-      message: "Authentication token has expired",
-      metadata: {
-        type: ErrorType.AUTH,
-        severity: ErrorSeverity.WARNING,
-        statusCode: 401,
-        retry: {
-          retryable: true,
-          delayMs: 0, // Immediate retry after getting a new token
-          maxRetries: 1
-        }
-      }
-    },
-    {
-      code: "insufficient_permissions",
-      message: "Insufficient permissions to {action}",
-      metadata: {
-        type: ErrorType.PERMISSION,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 403,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    
-    // State errors
-    {
-      code: "not_connected",
-      message: "Client is not connected",
-      metadata: {
-        type: ErrorType.STATE,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 400,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    {
-      code: "already_connected",
-      message: "Client is already connected",
-      metadata: {
-        type: ErrorType.STATE,
-        severity: ErrorSeverity.WARNING,
-        statusCode: 400,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    
-    // System errors
-    {
-      code: "system_error",
-      message: "System error: {details}",
-      metadata: {
-        type: ErrorType.SYSTEM,
-        severity: ErrorSeverity.CRITICAL,
-        statusCode: 500,
-        retry: {
-          retryable: false
-        }
-      }
-    },
-    {
-      code: "resource_exhausted",
-      message: "Resource {resource} exhausted",
-      metadata: {
-        type: ErrorType.SYSTEM,
-        severity: ErrorSeverity.ERROR,
-        statusCode: 429,
-        retry: {
-          retryable: true,
-          delayMs: 5000,
-          maxRetries: 3
-        }
-      }
-    },
-    {
-      code: "rate_limited",
-      message: "Rate limit exceeded for {operation}. Try again in {retryAfterMs}ms",
-      metadata: {
-        type: ErrorType.SYSTEM,
-        severity: ErrorSeverity.WARNING,
-        statusCode: 429,
-        retry: {
-          retryable: true,
-          delayMs: 1000,
-          maxRetries: 5
-        }
-      }
-    }
-  ])
-}
-
-/**
- * Error handling utilities
- */
-
-/**
- * Format a message template with parameters
- */
-function formatMessage(
-  template: string,
-  params: Record<string, string | number | boolean>
-): string {
-  return template.replace(/{(\w+)}/g, (match, key) => {
-    return params[key] !== undefined ? String(params[key]) : match
-  })
-}
-
-/**
- * Error handling decorator for async methods
- */
-export function handleErrors<T extends any[], R>(
-  fn: (...args: T) => Promise<R>,
-  errorHandler: (error: any) => Promise<R> | R
-): (...args: T) => Promise<R> {
-  return async (...args: T): Promise<R> => {
-    try {
-      return await fn(...args)
-    } catch (error) {
-      return errorHandler(error)
-    }
-  }
-}
-
-/**
- * Convert any error to a MessagingError
- */
-export function toMessagingError(error: any, defaultCode = "unknown_error"): MessagingError {
-  if (error instanceof MessagingError) {
-    return error
+  private mapErrorType(code: string): ErrorType {
+    if (code.includes("validation")) return ErrorType.VALIDATION
+    if (code.includes("auth")) return ErrorType.AUTHENTICATION
+    if (code.includes("permission")) return ErrorType.AUTHORIZATION
+    if (code.includes("connect")) return ErrorType.CONNECTION
+    if (code.includes("timeout")) return ErrorType.TIMEOUT
+    if (code.includes("not_found")) return ErrorType.NOT_FOUND
+    if (code.includes("conflict")) return ErrorType.CONFLICT
+    if (code.includes("server")) return ErrorType.SERVER
+    if (code.includes("client")) return ErrorType.CLIENT
+    return ErrorType.UNEXPECTED
   }
   
-  const registry = getErrorRegistry()
-  const errorMessage = error instanceof Error ? error.message : String(error)
+  /**
+   * Get all registered error definitions
+   */
+  getErrorDefinitions(): Map<string, ErrorDefinition> {
+    return new Map(this.errorDefinitions)
+  }
   
-  return registry.createError(defaultCode, {
-    details: error instanceof Error ? {
-      name: error.name,
-      stack: error.stack
-    } : { rawError: error },
-    cause: error instanceof Error ? error : undefined,
-    params: { details: errorMessage }
-  })
-}
-
-/**
- * Try to execute a function, returning a result or error
- */
-export async function tryCatch<T>(
-  fn: () => Promise<T> | T
-): Promise<{ success: true; result: T } | { success: false; error: MessagingError }> {
-  try {
-    const result = await fn()
-    return { success: true, result }
-  } catch (error) {
-    return { 
-      success: false, 
-      error: toMessagingError(error)
+  /**
+   * Check if an error code is registered
+   */
+  hasError(code: string): boolean {
+    return this.errorDefinitions.has(code)
+  }
+  
+  /**
+   * Convert any error to a MessagingError
+   */
+  toMessagingError(error: unknown, defaultCode = "system.unexpected_error"): MessagingError {
+    if (error instanceof MessagingError) {
+      return error
     }
+    
+    if (error instanceof Error) {
+      return this.createError(
+        defaultCode,
+        error.message,
+        { originalStack: error.stack }
+      )
+    }
+    
+    return this.createError(
+      defaultCode,
+      typeof error === "string" ? error : "Unknown error",
+      { originalError: error }
+    )
   }
 }
 
 /**
- * Retry a function with exponential backoff
+ * Retry function that handles retryable errors
+ * @param fn The function to retry
+ * @param options Retry options
  */
 export async function retry<T>(
   fn: () => Promise<T>,
   options: {
-    maxRetries?: number,
-    initialDelayMs?: number,
-    maxDelayMs?: number,
-    backoffFactor?: number,
-    retryIf?: (error: any) => boolean
+    maxRetries?: number;
+    retryDelay?: number;
+    retryMultiplier?: number;
+    shouldRetry?: (error: unknown) => boolean;
+    onRetry?: (error: unknown, attempt: number) => void;
   } = {}
 ): Promise<T> {
-  const maxRetries = options.maxRetries ?? 3
-  const initialDelayMs = options.initialDelayMs ?? 1000
-  const maxDelayMs = options.maxDelayMs ?? 30000
-  const backoffFactor = options.backoffFactor ?? 2
-  const retryIf = options.retryIf ?? ((error) => {
-    if (error instanceof MessagingError) {
-      return error.isRetryable()
-    }
-    return true
-  })
+  const {
+    maxRetries = 3,
+    retryDelay = 500,
+    retryMultiplier = 1.5,
+    shouldRetry = (error) => error instanceof MessagingError && error.retryable,
+    onRetry = () => {}
+  } = options
   
-  let lastError: any
-  let delayMs = initialDelayMs
+  let lastError: unknown
+  let delay = retryDelay
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -696,20 +284,43 @@ export async function retry<T>(
     } catch (error) {
       lastError = error
       
-      if (attempt === maxRetries || !retryIf(error)) {
-        break
+      if (attempt === maxRetries || !shouldRetry(error)) {
+        throw error
       }
       
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, delayMs))
+      onRetry(error, attempt + 1)
       
-      // Increase delay for next attempt (with max limit)
-      delayMs = Math.min(delayMs * backoffFactor, maxDelayMs)
+      await new Promise(resolve => setTimeout(resolve, delay))
+      delay = Math.floor(delay * retryMultiplier)
     }
   }
   
-  throw toMessagingError(lastError, "retry_failed")
+  // This should never happen, but TypeScript needs it
+  throw lastError
 }
 
-// Register system errors by default
-registerSystemErrors()
+/**
+ * Error handling utility for standardized error processing
+ */
+export async function handleErrors<T>(
+  fn: () => Promise<T>,
+  options: {
+    errorRegistry: ErrorRegistry<any>;
+    defaultErrorCode?: string;
+    onError?: (error: MessagingError) => void;
+  }
+): Promise<T> {
+  const {
+    errorRegistry,
+    defaultErrorCode = "system.unexpected_error",
+    onError = () => {}
+  } = options
+  
+  try {
+    return await fn()
+  } catch (error) {
+    const messagingError = errorRegistry.toMessagingError(error, defaultErrorCode)
+    onError(messagingError)
+    throw messagingError
+  }
+}

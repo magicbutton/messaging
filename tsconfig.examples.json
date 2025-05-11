@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "declaration": false,
+    "outDir": "dist/examples",
+    "rootDir": ".",
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["examples/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

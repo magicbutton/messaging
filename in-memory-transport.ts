@@ -1,20 +1,18 @@
-import type { TransportAdapter, MessageContext, AuthResult } from "./types"
+import { BaseTransport } from "./transport-adapter"
+import type { Contract, MessageContext, AuthResult, InferEventData, InferRequestData, InferResponseData } from "./types"
 import { v4 as uuidv4 } from "uuid"
 
 /**
  * In-memory transport adapter for testing
  */
-export class InMemoryTransport<TEvents extends Record<string, any> = {}, TRequests extends Record<string, any> = {}>
-  implements TransportAdapter<TEvents, TRequests>
-{
-  private connected = false
-  private connectionString = ""
+export class InMemoryTransport<TContract extends Contract> extends BaseTransport<TContract> {
   private eventHandlers: Map<string, Set<(payload: any, context: MessageContext) => void>> = new Map()
   private requestHandlers: Map<string, (payload: any, context: MessageContext) => Promise<any>> = new Map()
   private users: Map<string, { username: string; password: string; id: string }> = new Map()
   private tokens: Map<string, { userId: string; expiresAt: number }> = new Map()
 
   constructor() {
+    super();
     // Add a test user
     this.users.set("test", {
       username: "test",
@@ -42,26 +40,16 @@ export class InMemoryTransport<TEvents extends Record<string, any> = {}, TReques
   }
 
   /**
-   * Get the connection string
-   */
-  getConnectionString(): string {
-    return this.connectionString
-  }
-
-  /**
-   * Check if connected
-   */
-  isConnected(): boolean {
-    return this.connected
-  }
-
-  /**
    * Emit an event
    * @param event The event type
    * @param payload The event payload
    * @param context The message context
    */
-  async emit<E extends string & keyof TEvents>(event: E, payload: any, context: MessageContext = {}): Promise<void> {
+  async emit<E extends keyof TContract["events"] & string>(
+    event: E, 
+    payload: InferEventData<TContract["events"], E>, 
+    context: MessageContext = {}
+  ): Promise<void> {
     if (!this.connected) {
       throw new Error("Not connected")
     }
@@ -90,9 +78,12 @@ export class InMemoryTransport<TEvents extends Record<string, any> = {}, TReques
    * @param event The event type
    * @param handler The event handler
    */
-  on<E extends string & keyof TEvents>(
+  on<E extends keyof TContract["events"] & string>(
     event: E,
-    handler: (payload: any, context: MessageContext) => void,
+    handler: (
+      payload: InferEventData<TContract["events"], E>, 
+      context: MessageContext
+    ) => void,
     subscriptionContext?: MessageContext,
   ): void {
     let handlers = this.eventHandlers.get(event)
@@ -100,7 +91,7 @@ export class InMemoryTransport<TEvents extends Record<string, any> = {}, TReques
       handlers = new Set()
       this.eventHandlers.set(event, handlers)
     }
-    handlers.add(handler)
+    handlers.add(handler as any)
   }
 
   /**
@@ -108,10 +99,16 @@ export class InMemoryTransport<TEvents extends Record<string, any> = {}, TReques
    * @param event The event type
    * @param handler The event handler
    */
-  off<E extends string & keyof TEvents>(event: E, handler: (payload: any, context: MessageContext) => void): void {
+  off<E extends keyof TContract["events"] & string>(
+    event: E, 
+    handler: (
+      payload: InferEventData<TContract["events"], E>, 
+      context: MessageContext
+    ) => void
+  ): void {
     const handlers = this.eventHandlers.get(event)
     if (handlers) {
-      handlers.delete(handler)
+      handlers.delete(handler as any)
       if (handlers.size === 0) {
         this.eventHandlers.delete(event)
       }
@@ -124,11 +121,11 @@ export class InMemoryTransport<TEvents extends Record<string, any> = {}, TReques
    * @param payload The request payload
    * @param context The message context
    */
-  async request<R extends string & keyof TRequests>(
+  async request<R extends keyof TContract["requests"] & string>(
     requestType: R,
-    payload: any,
+    payload: InferRequestData<TContract["requests"], R>,
     context: MessageContext = {},
-  ): Promise<any> {
+  ): Promise<InferResponseData<TContract["requests"], R>> {
     if (!this.connected) {
       throw new Error("Not connected")
     }
@@ -153,11 +150,14 @@ export class InMemoryTransport<TEvents extends Record<string, any> = {}, TReques
    * @param requestType The request type
    * @param handler The request handler
    */
-  handleRequest<R extends string & keyof TRequests>(
+  handleRequest<R extends keyof TContract["requests"] & string>(
     requestType: R,
-    handler: (payload: any, context: MessageContext) => Promise<any>,
+    handler: (
+      payload: InferRequestData<TContract["requests"], R>, 
+      context: MessageContext
+    ) => Promise<InferResponseData<TContract["requests"], R>>,
   ): void {
-    this.requestHandlers.set(requestType, handler)
+    this.requestHandlers.set(requestType, handler as any)
   }
 
   /**

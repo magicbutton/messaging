@@ -200,17 +200,20 @@ export function createEventValidationMiddleware<TEvents extends EventSchemas>(
   const logger = getObservabilityProvider().getLogger("validation.event")
   
   return async (event, next) => {
-    const schema = eventSchemas[event.type]
-    
-    if (!schema) {
+    const schemaObj = eventSchemas[event.type]
+
+    if (!schemaObj) {
       logger.warn(`No schema found for event type: ${event.type}`)
       return next(event)
     }
-    
+
+    // Get the actual schema (handle both direct schema or {schema, description} format)
+    const schema = 'schema' in schemaObj ? schemaObj.schema : schemaObj
+
     try {
       // Validate the event payload against the schema
       const validatedPayload = schema.parse(event.payload)
-      
+
       // Continue with validated payload
       return next({
         ...event,
@@ -243,37 +246,41 @@ export function createRequestValidationMiddleware<TRequests extends RequestSchem
   requestSchemas: TRequests
 ): RequestMiddleware {
   const logger = getObservabilityProvider().getLogger("validation.request")
-  
+
   return async (request, next) => {
-    const schemas = requestSchemas[request.type]
-    
-    if (!schemas) {
+    const schemasObj = requestSchemas[request.type]
+
+    if (!schemasObj) {
       logger.warn(`No schema found for request type: ${request.type}`)
       return next(request)
     }
-    
+
+    // Get the actual schemas (handle both formats)
+    const requestSchema = 'requestSchema' in schemasObj ? schemasObj.requestSchema : schemasObj.request
+    const responseSchema = 'responseSchema' in schemasObj ? schemasObj.responseSchema : schemasObj.response
+
     try {
       // Validate the request payload against the schema
-      const validatedPayload = schemas.requestSchema.parse(request.payload)
-      
+      const validatedPayload = requestSchema.parse(request.payload)
+
       // Continue with validated payload
       const response = await next({
         ...request,
         payload: validatedPayload
       })
-      
+
       // If response is successful, validate it too
       if (response.success && response.data) {
         try {
-          const validatedResponse = schemas.responseSchema.parse(response.data)
+          const validatedResponse = responseSchema.parse(response.data)
           return {
             ...response,
             data: validatedResponse
           }
         } catch (error) {
-          logger.error(`Validation error for response to ${request.type}`, 
+          logger.error(`Validation error for response to ${request.type}`,
             error instanceof Error ? error : new Error(String(error)))
-          
+
           // Convert Zod error to something more readable
           if (error instanceof z.ZodError) {
             return {
@@ -289,7 +296,7 @@ export function createRequestValidationMiddleware<TRequests extends RequestSchem
               context: response.context
             }
           }
-          
+
           return {
             success: false,
             error: {
@@ -300,12 +307,12 @@ export function createRequestValidationMiddleware<TRequests extends RequestSchem
           }
         }
       }
-      
+
       return response
     } catch (error) {
-      logger.error(`Validation error for request ${request.type}`, 
+      logger.error(`Validation error for request ${request.type}`,
         error instanceof Error ? error : new Error(String(error)))
-      
+
       // Convert Zod error to something more readable
       if (error instanceof z.ZodError) {
         return {
@@ -321,7 +328,7 @@ export function createRequestValidationMiddleware<TRequests extends RequestSchem
           context: request.context
         }
       }
-      
+
       return {
         success: false,
         error: {

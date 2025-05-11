@@ -7,7 +7,8 @@ This document explains how to navigate and use the Magic Button Messaging docume
 The documentation is organized as follows:
 
 1. **API Reference**: Generated with TypeDoc from code comments
-   - Located in `/docs/api/`
+   - HTML Version: Located in `/docs/api/`
+   - Markdown Version: Located in `/docs/markdown/`
    - Contains detailed documentation for all classes, interfaces, types, and functions
    - Browsable by module, class, or interface
 
@@ -25,30 +26,35 @@ The API reference provides several ways to find the information you need:
 
 ### Key Reference Pages
 
-- [Client](./api/classes/Client.html) - Main client class for connecting to servers
-- [Server](./api/classes/Server.html) - Server implementation for handling client requests
-- [TransportAdapter](./api/interfaces/TransportAdapter.html) - Interface for implementing custom transports
-- [AccessControl](./api/classes/AccessControl.html) - Role-based access control system
+#### HTML Version
+- [MessagingClient](./api/classes/MessagingClient.html) - Main client class for connecting to servers
+- [MessagingServer](./api/classes/MessagingServer.html) - Server implementation for handling client requests
+- [Transport Interface](./api/interfaces/ITransport.html) - Interface for implementing custom transports
+- [Factory Interfaces](./api/modules.html) - Factory interfaces for all components
+
+#### Markdown Version
+- [Factory Interfaces](./markdown/interfaces.md) - Core interfaces for the factory pattern
+- [Component Classes](./markdown/classes.md) - Implementation classes
+- [Provider Registries](./markdown/modules.md) - Factory registries for dependency injection
 
 ## Examples
 
-The examples directory contains several complete examples:
+The examples directory contains several complete examples that demonstrate the factory pattern:
 
-- [Error Handling](../examples/error-handling-example.ts) - How to handle errors
-- [Middleware](../examples/middleware-example.ts) - Using middleware
-- [Observability](../examples/observability-example.ts) - Logging, metrics, and tracing
-- [Testing](../examples/testing-example.ts) - Testing your contracts
-- [Versioning](../examples/versioning-example.ts) - Versioning your contracts
+- [Transport DI Example](../examples/transport-di-example.ts) - Transport factory dependency injection
+- [Configuration & Middleware Example](../examples/configuration-middleware-example.ts) - Using configuration and middleware factories
 
 ## Best Practices
 
 When using Magic Button Messaging, consider these best practices:
 
-1. **Define Contracts First**: Start by defining your communication contracts with Zod schemas
-2. **Use Type Safety**: Leverage TypeScript's type system and Zod's validation
-3. **Choose the Right Transport**: Pick a transport that matches your needs (WebSockets, HTTP, etc.)
-4. **Implement Access Control**: Secure your API with role-based access control
-5. **Add Observability**: Use the built-in observability tools for monitoring
+1. **Use Factory Pattern**: Create components through factories for proper dependency injection
+2. **Define Contracts First**: Start by defining your communication contracts with Zod schemas
+3. **Use Type Safety**: Leverage TypeScript's type system and Zod's validation
+4. **Choose the Right Transport**: Pick a transport that matches your needs (WebSockets, HTTP, etc.)
+5. **Implement Access Control**: Secure your API with role-based access control
+6. **Add Observability**: Use the built-in observability tools for monitoring
+7. **Configure Through Registry**: Use the configuration system and registries for all components
 
 ## Troubleshooting
 

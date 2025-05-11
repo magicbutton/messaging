@@ -1,58 +1,23 @@
-import type { TransportAdapter, MessageContext, AuthResult } from "./types"
-import type { systemEvents, systemRequests } from "./system-contract"
 import { v4 as uuidv4 } from "uuid"
+import {
+  Transport,
+  Contract,
+  ClientOptions,
+  MessageContext,
+  AuthResult,
+  ClientStatus,
+  InferEventData,
+  InferRequestData,
+  InferResponseData,
+  AuthProvider
+} from "./types"
+import { AuthProviderRegistry } from "./auth-provider-factory"
 
 /**
- * Client options for configuring the messaging client
- *
- * @interface ClientOptions
- * @property {string} [clientId] - Unique identifier for the client. If not provided, a UUID will be generated
- * @property {string} [clientType] - Type of client, used for identification and filtering. Default: "generic"
- * @property {boolean} [autoReconnect] - Whether to automatically reconnect when the connection is lost. Default: true
- * @property {number} [reconnectInterval] - Interval in milliseconds between reconnection attempts. Default: 5000
- * @property {number} [heartbeatInterval] - Interval in milliseconds for sending heartbeat messages. Default: 30000
- * @property {string[]} [capabilities] - List of capabilities supported by this client
- * @property {Record<string, unknown>} [metadata] - Additional metadata for the client
+ * Generic messaging client that works with any contract and transport through dependency injection
  */
-export interface ClientOptions {
-  clientId?: string
-  clientType?: string
-  autoReconnect?: boolean
-  reconnectInterval?: number
-  heartbeatInterval?: number
-  capabilities?: string[]
-  metadata?: Record<string, unknown>
-}
-
-/**
- * Enum representing the possible states of a messaging client
- *
- * @enum {string}
- * @property {string} DISCONNECTED - Client is disconnected from the server
- * @property {string} CONNECTING - Client is currently attempting to connect to the server
- * @property {string} CONNECTED - Client is successfully connected to the server
- * @property {string} RECONNECTING - Client lost connection and is attempting to reconnect
- * @property {string} ERROR - Client encountered an error during connection or operation
- */
-export enum ClientStatus {
-  DISCONNECTED = "disconnected",
-  CONNECTING = "connecting",
-  CONNECTED = "connected",
-  RECONNECTING = "reconnecting",
-  ERROR = "error",
-}
-
-/**
- * Client class that uses a TransportAdapter to communicate with a messaging server.
- * Provides typed request/response communication and event subscription capabilities
- * with automatic reconnection, heartbeats, and subscription management.
- *
- * @class Client
- * @template TEvents Type of events this client can handle, extended with system events
- * @template TRequests Type of requests this client can send, extended with system requests
- */
-export class Client<TEvents extends Record<string, any> = {}, TRequests extends Record<string, any> = {}> {
-  private adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>
+export class MessagingClient<TContract extends Contract> {
+  private transport: Transport<TContract>
   private options: Required<ClientOptions>
   private status: ClientStatus = ClientStatus.DISCONNECTED
   private connectionId: string | null = null
@@ -63,30 +28,20 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
   private subscriptions: Map<string, { events: string[]; filter?: Record<string, unknown> }> = new Map()
   private statusListeners: Set<(status: ClientStatus) => void> = new Set()
   private errorListeners: Set<(error: Error) => void> = new Set()
+  private authProvider: AuthProvider
+  private authToken?: string
 
   /**
-   * Creates a new messaging client instance
-   *
-   * @constructor
-   * @param {TransportAdapter<TEvents & systemEvents, TRequests & systemRequests>} adapter - The transport adapter to use for communication
-   * @param {ClientOptions} [options={}] - Configuration options for the client
-   * @example
-   * // Create a client with in-memory transport
-   * const transport = new InMemoryTransport();
-   * const client = new Client(transport, {
-   *   clientId: "frontend-client-1",
-   *   clientType: "frontend",
-   *   autoReconnect: true
-   * });
-   *
-   * // Connect to a server
-   * await client.connect("memory://my-server");
+   * Creates a new messaging client instance with dependency injection
+   * 
+   * @param transport - The transport implementation to use for communication
+   * @param options - Configuration options for the client
    */
   constructor(
-    adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>,
-    options: ClientOptions = {},
+    transport: Transport<TContract>,
+    options: ClientOptions = {}
   ) {
-    this.adapter = adapter
+    this.transport = transport
     this.options = {
       clientId: options.clientId || uuidv4(),
       clientType: options.clientType || "generic",
@@ -95,7 +50,11 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
       heartbeatInterval: options.heartbeatInterval || 30000,
       capabilities: options.capabilities || [],
       metadata: options.metadata || {},
+      authProvider: options.authProvider || this.createDefaultAuthProvider()
     }
+
+    // Set up authentication provider
+    this.authProvider = this.options.authProvider
 
     // Set up system event handlers
     this.setupSystemEventHandlers()
@@ -106,17 +65,17 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    */
   private setupSystemEventHandlers(): void {
     // Handle heartbeat events
-    this.adapter.on("$heartbeat", (payload) => {
+    this.transport.on("$heartbeat" as any, (payload) => {
       this.lastHeartbeat = payload.timestamp
     })
 
     // Handle broadcast events
-    this.adapter.on("$broadcast", (payload, context) => {
+    this.transport.on("$broadcast" as any, (payload, context) => {
       console.log(`Broadcast received: ${payload.message}`, payload.data)
     })
 
     // Handle error events
-    this.adapter.on("$error", (payload) => {
+    this.transport.on("$error" as any, (payload) => {
       const error = new Error(payload.message)
       error.name = payload.code
       this.notifyErrorListeners(error)
@@ -125,29 +84,16 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
 
   /**
    * Connects the client to a messaging server using the provided connection string.
-   * Establishes a connection via the transport adapter, registers with the server,
-   * starts heartbeats, and restores any previous subscriptions.
-   *
-   * @async
-   * @param {string} connectionString - The connection string for the server
-   * @returns {Promise<void>} A promise that resolves when connected successfully
-   * @throws {Error} If connection fails or registration with the server fails
-   * @example
-   * // Connect to an in-memory server
-   * await client.connect("memory://message-server");
-   *
-   * // Connect to a WebSocket server
-   * await client.connect("ws://localhost:8080/messaging");
    */
   async connect(connectionString: string): Promise<void> {
     try {
       this.setStatus(ClientStatus.CONNECTING)
 
-      // Connect the transport adapter
-      await this.adapter.connect(connectionString)
+      // Connect the transport
+      await this.transport.connect(connectionString)
 
       // Register with the server
-      const response = await this.adapter.request("$register", {
+      const response = await this.transport.request("$register" as any, {
         clientId: this.options.clientId,
         clientType: this.options.clientType,
         capabilities: this.options.capabilities,
@@ -190,14 +136,14 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
 
       // Only unregister if we have a connection
       if (this.connectionId) {
-        await this.adapter.request("$unregister", {
+        await this.transport.request("$unregister" as any, {
           clientId: this.options.clientId,
           connectionId: this.connectionId,
         })
       }
 
-      // Disconnect the transport adapter
-      await this.adapter.disconnect()
+      // Disconnect the transport
+      await this.transport.disconnect()
 
       // Reset connection state
       this.connectionId = null
@@ -236,7 +182,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    */
   private async sendHeartbeat(): Promise<void> {
     try {
-      await this.adapter.emit("$heartbeat", {
+      await this.transport.emit("$heartbeat" as any, {
         timestamp: Date.now(),
         clientId: this.options.clientId,
       })
@@ -263,7 +209,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
     this.reconnectTimer = setTimeout(async () => {
       try {
         // Try to reconnect
-        await this.connect(this.adapter.getConnectionString())
+        await this.connect(this.transport.getConnectionString())
       } catch (error) {
         // If reconnect fails, schedule another attempt
         this.scheduleReconnect()
@@ -287,7 +233,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
   private async restoreSubscriptions(): Promise<void> {
     for (const [subscriptionId, { events, filter }] of this.subscriptions.entries()) {
       try {
-        await this.adapter.request("$subscribe", {
+        await this.transport.request("$subscribe" as any, {
           clientId: this.options.clientId,
           events,
           filter,
@@ -338,7 +284,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param filter Optional filter for the events
    */
   async subscribe(events: string[], filter?: Record<string, unknown>): Promise<string> {
-    const response = await this.adapter.request("$subscribe", {
+    const response = await this.transport.request("$subscribe" as any, {
       clientId: this.options.clientId,
       events,
       filter,
@@ -355,7 +301,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param subscriptionId The subscription ID to unsubscribe
    */
   async unsubscribe(subscriptionId: string): Promise<void> {
-    await this.adapter.request("$unsubscribe", {
+    await this.transport.request("$unsubscribe" as any, {
       clientId: this.options.clientId,
       subscriptionId,
     })
@@ -368,7 +314,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    * Get server information
    */
   async getServerInfo(): Promise<any> {
-    return this.adapter.request("$serverInfo", {})
+    return this.transport.request("$serverInfo" as any, {})
   }
 
   /**
@@ -377,7 +323,7 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    */
   async ping(payload?: string): Promise<{ roundTripTime: number }> {
     const startTime = Date.now()
-    const response = await this.adapter.request("$ping", {
+    const response = await this.transport.request("$ping" as any, {
       timestamp: startTime,
       payload,
     })
@@ -393,12 +339,21 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param payload The request payload
    * @param context Optional message context
    */
-  async request<R extends string & keyof TRequests>(
+  async request<R extends keyof TContract["requests"] & string>(
     requestType: R,
-    payload: any,
+    payload: InferRequestData<TContract["requests"], R>,
     context?: MessageContext,
-  ): Promise<any> {
-    return this.adapter.request(requestType, payload, context)
+  ): Promise<InferResponseData<TContract["requests"], R>> {
+    // Merge auth information if we have a token
+    const fullContext: MessageContext = { ...context }
+    if (this.authToken) {
+      fullContext.auth = {
+        ...(fullContext.auth || {}),
+        token: this.authToken
+      }
+    }
+    
+    return this.transport.request(requestType, payload, fullContext)
   }
 
   /**
@@ -407,8 +362,21 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param payload The event payload
    * @param context Optional message context
    */
-  async emit<E extends string & keyof TEvents>(event: E, payload: any, context?: MessageContext): Promise<void> {
-    return this.adapter.emit(event, payload, context)
+  async emit<E extends keyof TContract["events"] & string>(
+    event: E,
+    payload: InferEventData<TContract["events"], E>,
+    context?: MessageContext
+  ): Promise<void> {
+    // Merge auth information if we have a token
+    const fullContext: MessageContext = { ...context }
+    if (this.authToken) {
+      fullContext.auth = {
+        ...(fullContext.auth || {}),
+        token: this.authToken
+      }
+    }
+    
+    return this.transport.emit(event, payload, fullContext)
   }
 
   /**
@@ -417,12 +385,15 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param handler The event handler
    * @param context Optional subscription context
    */
-  on<E extends string & keyof (TEvents & typeof systemEvents)>(
+  on<E extends keyof TContract["events"] & string>(
     event: E,
-    handler: (payload: any, context: MessageContext) => void,
+    handler: (
+      payload: InferEventData<TContract["events"], E>, 
+      context: MessageContext
+    ) => void,
     context?: MessageContext,
   ): void {
-    this.adapter.on(event, handler, context)
+    this.transport.on(event, handler, context)
   }
 
   /**
@@ -483,17 +454,63 @@ export class Client<TEvents extends Record<string, any> = {}, TRequests extends 
   }
 
   /**
+   * Get the authentication provider
+   */
+  getAuthProvider(): AuthProvider {
+    return this.authProvider
+  }
+
+  /**
+   * Creates a default auth provider using the factory pattern
+   * @private
+   */
+  private createDefaultAuthProvider(): AuthProvider {
+    // Use the registry to create a default auth provider if available
+    if (AuthProviderRegistry.hasFactory("default")) {
+      return AuthProviderRegistry.createAuthProvider({
+        type: "default"
+      });
+    }
+
+    // Fallback for backward compatibility if registry isn't set up
+    // This will be removed in a future version
+    console.warn("Using deprecated auth provider creation. Please register a factory.");
+    const legacyProvider = require("./auth-provider").DefaultAuthProvider;
+    return new legacyProvider();
+  }
+
+  /**
    * Login to the server
    * @param credentials The login credentials
    */
   async login(credentials: { username: string; password: string } | { token: string }): Promise<AuthResult> {
-    return this.adapter.login(credentials)
+    // First authenticate with our auth provider
+    const authResult = await this.authProvider.authenticate(credentials)
+    
+    if (authResult.success && authResult.token) {
+      // Store the token for future requests
+      this.authToken = authResult.token
+      
+      // Now login on the transport
+      return this.transport.login(credentials)
+    }
+    
+    return authResult
   }
 
   /**
    * Logout from the server
    */
   async logout(): Promise<void> {
-    return this.adapter.logout()
+    if (this.authToken) {
+      // Logout from auth provider
+      await this.authProvider.logout(this.authToken)
+      
+      // Clear token
+      this.authToken = undefined
+      
+      // Logout from transport
+      return this.transport.logout()
+    }
   }
 }

@@ -136,49 +136,74 @@ export function getSchemaByVersion<T extends z.ZodType>(
 /**
  * Convert versioned event schemas to standard event schemas (using latest versions)
  * @param versionedSchemas The versioned event schemas
+ * @param includeDescription Whether to include descriptions in the output schemas
  * @returns Standard event schemas
  */
-export function toEventSchemas(versionedSchemas: VersionedEventSchemas): EventSchemas {
+export function toEventSchemas(
+  versionedSchemas: VersionedEventSchemas,
+  includeDescription = false
+): EventSchemas {
   const result: EventSchemas = {}
-  
+
   for (const [key, schemas] of Object.entries(versionedSchemas)) {
     const latestSchema = getLatestSchema(schemas)
     if (latestSchema) {
-      result[key] = latestSchema.schema
+      if (includeDescription && latestSchema.schema.description) {
+        result[key] = {
+          schema: latestSchema.schema,
+          description: latestSchema.schema.description
+        }
+      } else {
+        result[key] = latestSchema.schema
+      }
     }
   }
-  
+
   return result
 }
 
 /**
  * Convert versioned request schemas to standard request schemas (using latest versions)
  * @param versionedSchemas The versioned request schemas
+ * @param includeDescription Whether to include descriptions in the output schemas
  * @returns Standard request schemas
  */
-export function toRequestSchemas(versionedSchemas: VersionedRequestSchemas): RequestSchemas {
+export function toRequestSchemas(
+  versionedSchemas: VersionedRequestSchemas,
+  includeDescription = false
+): RequestSchemas {
   const result: RequestSchemas = {}
-  
+
   for (const [key, { requestSchemas, responseSchemas }] of Object.entries(versionedSchemas)) {
     const latestRequestSchema = getLatestSchema(requestSchemas)
     const latestResponseSchema = getLatestSchema(responseSchemas)
-    
+
     if (latestRequestSchema && latestResponseSchema) {
-      result[key] = {
-        requestSchema: latestRequestSchema.schema,
-        responseSchema: latestResponseSchema.schema
+      // Check if either schema has a description and if we should include it
+      if (includeDescription &&
+          (latestRequestSchema.schema.description || latestResponseSchema.schema.description)) {
+        result[key] = {
+          request: latestRequestSchema.schema,
+          response: latestResponseSchema.schema,
+          description: latestRequestSchema.schema.description ||
+                     latestResponseSchema.schema.description
+        }
+      } else {
+        result[key] = {
+          requestSchema: latestRequestSchema.schema,
+          responseSchema: latestResponseSchema.schema
+        }
       }
     }
   }
-  
+
   return result
 }
 
 /**
  * Create a versioned contract
- * @param events The versioned event schemas
- * @param requests The versioned request schemas
- * @returns The versioned contract
+ * @param contract The contract definition with events and requests
+ * @returns The versioned contract with a toStandard method
  */
 export function createVersionedContract<
   TEvents extends VersionedEventSchemas,
@@ -189,7 +214,7 @@ export function createVersionedContract<
 }): {
   events: TEvents
   requests: TRequests
-  toStandard: () => {
+  toStandard: (includeDescriptions?: boolean) => {
     events: EventSchemas
     requests: RequestSchemas
   }
@@ -197,9 +222,9 @@ export function createVersionedContract<
   return {
     events: contract.events,
     requests: contract.requests,
-    toStandard: () => ({
-      events: toEventSchemas(contract.events),
-      requests: toRequestSchemas(contract.requests)
+    toStandard: (includeDescriptions = false) => ({
+      events: toEventSchemas(contract.events, includeDescriptions),
+      requests: toRequestSchemas(contract.requests, includeDescriptions)
     })
   }
 }

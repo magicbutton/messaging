@@ -5,17 +5,29 @@ import type { EventSchemas, RequestSchemas, MessageContext } from "./types"
  *
  * This function helps maintain type safety when defining request schemas.
  * It simply returns the input object, but with proper TypeScript typing.
+ * It supports both the traditional format with requestSchema/responseSchema
+ * and the alternative format with request/response.
  *
  * @template T - The type of request schemas
- * @param {T} schemas - Object containing request schemas with requestSchema and responseSchema
+ * @param {T} schemas - Object containing request schemas
  * @returns {T} - The validated request schema map
  *
  * @example
  * ```typescript
- * const requestSchemas = createRequestSchemaMap({
+ * // Traditional format
+ * const traditionalSchemas = createRequestSchemaMap({
  *   getUser: {
  *     requestSchema: z.object({ userId: z.string() }),
  *     responseSchema: z.object({ name: z.string(), email: z.string() })
+ *   }
+ * });
+ *
+ * // Alternative format with description
+ * const alternativeSchemas = createRequestSchemaMap({
+ *   "user.get": {
+ *     request: z.object({ userId: z.string() }),
+ *     response: z.object({ name: z.string(), email: z.string() }),
+ *     description: "Get user by ID"
  *   }
  * });
  * ```
@@ -29,16 +41,30 @@ export function createRequestSchemaMap<T extends RequestSchemas>(schemas: T): T 
  *
  * This function helps maintain type safety when defining event schemas.
  * It simply returns the input object, but with proper TypeScript typing.
+ * It supports both direct schema objects and objects with schema and description fields.
  *
  * @template T - The type of event schemas
- * @param {T} schemas - Object containing event schemas
+ * @param {T} schemas - Object containing event schemas or objects with schema and description
  * @returns {T} - The validated event schema map
  *
  * @example
  * ```typescript
- * const eventSchemas = createEventMap({
+ * // Simple format with just schemas
+ * const simpleEvents = createEventMap({
  *   userCreated: z.object({ userId: z.string(), timestamp: z.number() }),
  *   userDeleted: z.object({ userId: z.string(), timestamp: z.number() })
+ * });
+ *
+ * // Extended format with schema and description
+ * const extendedEvents = createEventMap({
+ *   'user.created': {
+ *     schema: z.object({ userId: z.string(), timestamp: z.number() }),
+ *     description: 'Emitted when a new user is created'
+ *   },
+ *   'user.deleted': {
+ *     schema: z.object({ userId: z.string(), timestamp: z.number() }),
+ *     description: 'Emitted when a user is deleted from the system'
+ *   }
  * });
  * ```
  */

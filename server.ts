@@ -1,11 +1,22 @@
-import type { TransportAdapter, MessageContext } from "./types"
-import type { systemEvents, systemRequests } from "./system-contract"
 import { v4 as uuidv4 } from "uuid"
+import {
+  Transport,
+  Contract,
+  ServerOptions,
+  MessageContext,
+  InferEventData,
+  InferRequestData,
+  InferResponseData,
+  AuthProvider,
+  AuthorizationProvider
+} from "./types"
+import { AuthProviderRegistry } from "./auth-provider-factory"
+import { AuthorizationProviderRegistry } from "./authorization-provider-factory"
 
 /**
  * Client connection information
  */
-interface ClientConnection {
+export interface ClientConnection {
   clientId: string
   connectionId: string
   clientType: string
@@ -16,72 +27,35 @@ interface ClientConnection {
 }
 
 /**
- * Configuration options for the messaging server
- *
- * @interface ServerOptions
- * @property {string} [serverId] - Unique identifier for the server. If not provided, a UUID will be generated
- * @property {string} [version] - Version of the server. Default: "1.0.0"
- * @property {number} [heartbeatInterval] - Interval in milliseconds for sending heartbeat messages. Default: 30000
- * @property {number} [clientTimeout] - Timeout in milliseconds after which clients are considered disconnected. Default: 90000 (3x heartbeat interval)
- * @property {number} [maxClients] - Maximum number of clients that can connect to this server. Default: 1000
- * @property {string[]} [capabilities] - List of capabilities supported by this server
+ * Generic messaging server that works with any contract and transport through dependency injection
  */
-export interface ServerOptions {
-  serverId?: string
-  version?: string
-  heartbeatInterval?: number
-  clientTimeout?: number
-  maxClients?: number
-  capabilities?: string[]
-}
-
-/**
- * Server class that manages client connections and message routing
- *
- * The Server is responsible for:
- * - Managing client connections and their lifecycle
- * - Routing messages between clients
- * - Handling client registration and authentication
- * - Processing requests and distributing events
- * - Monitoring client health through heartbeats
- *
- * @class Server
- * @template TEvents Type of events this server can handle, extended with system events
- * @template TRequests Type of requests this server can process, extended with system requests
- */
-export class Server<TEvents extends Record<string, any> = {}, TRequests extends Record<string, any> = {}> {
-  private adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>
+export class MessagingServer<TContract extends Contract> {
+  private transport: Transport<TContract>
   private options: Required<ServerOptions>
   private clients: Map<string, ClientConnection> = new Map()
   private connectionIdToClientId: Map<string, string> = new Map()
   private heartbeatTimer: NodeJS.Timeout | null = null
   private startTime: number = Date.now()
-  private requestHandlers: Map<string, (payload: any, context: MessageContext, clientId: string) => Promise<any>> =
-    new Map()
+  private requestHandlers: Map<
+    string, 
+    (payload: any, context: MessageContext, clientId: string) => Promise<any>
+  > = new Map()
+  private authProvider: AuthProvider
+  private authorizationProvider: AuthorizationProvider<TContract>
 
   /**
-   * Creates a new messaging server instance
-   *
-   * @constructor
-   * @param {TransportAdapter<TEvents & systemEvents, TRequests & systemRequests>} adapter - The transport adapter to use for communication
-   * @param {ServerOptions} [options={}] - Configuration options for the server
-   * @example
-   * // Create a server with in-memory transport
-   * const transport = new InMemoryTransport();
-   * const server = new Server(transport, {
-   *   serverId: "main-message-server",
-   *   version: "2.0.0",
-   *   maxClients: 500
-   * });
-   *
-   * // Start the server
-   * await server.start("memory://my-server");
+   * Creates a new messaging server instance with dependency injection
+   * 
+   * @param transport - The transport implementation to use for communication
+   * @param contract - The contract definition to use for authorization
+   * @param options - Configuration options for the server
    */
   constructor(
-    adapter: TransportAdapter<typeof systemEvents & TEvents, typeof systemRequests & TRequests>,
-    options: ServerOptions = {},
+    transport: Transport<TContract>,
+    contract: TContract,
+    options: ServerOptions = {}
   ) {
-    this.adapter = adapter
+    this.transport = transport
     this.options = {
       serverId: options.serverId || uuidv4(),
       version: options.version || "1.0.0",
@@ -89,7 +63,13 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
       clientTimeout: options.clientTimeout || 90000, // 3x heartbeat interval by default
       maxClients: options.maxClients || 1000,
       capabilities: options.capabilities || [],
+      authProvider: options.authProvider || this.createDefaultAuthProvider(),
+      authorizationProvider: options.authorizationProvider || this.createDefaultAuthorizationProvider(contract)
     }
+
+    // Set up authentication and authorization providers
+    this.authProvider = this.options.authProvider
+    this.authorizationProvider = this.options.authorizationProvider
 
     // Set up system request handlers
     this.setupSystemRequestHandlers()
@@ -100,17 +80,17 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
    */
   private setupSystemRequestHandlers(): void {
     // Handle client registration
-    this.adapter.handleRequest("$register", async (payload, context) => {
+    this.transport.handleRequest("$register" as any, async (payload, context) => {
       return this.handleClientRegister(payload, context)
     })
 
     // Handle client unregistration
-    this.adapter.handleRequest("$unregister", async (payload, context) => {
+    this.transport.handleRequest("$unregister" as any, async (payload, context) => {
       return this.handleClientUnregister(payload, context)
     })
 
     // Handle ping requests
-    this.adapter.handleRequest("$ping", async (payload, context) => {
+    this.transport.handleRequest("$ping" as any, async (payload, context) => {
       return {
         timestamp: payload.timestamp,
         serverTime: Date.now(),
@@ -119,7 +99,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     })
 
     // Handle server info requests
-    this.adapter.handleRequest("$serverInfo", async (payload, context) => {
+    this.transport.handleRequest("$serverInfo" as any, async (payload, context) => {
       return {
         serverId: this.options.serverId,
         version: this.options.version,
@@ -131,17 +111,17 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     })
 
     // Handle subscription requests
-    this.adapter.handleRequest("$subscribe", async (payload, context) => {
+    this.transport.handleRequest("$subscribe" as any, async (payload, context) => {
       return this.handleClientSubscribe(payload, context)
     })
 
     // Handle unsubscription requests
-    this.adapter.handleRequest("$unsubscribe", async (payload, context) => {
+    this.transport.handleRequest("$unsubscribe" as any, async (payload, context) => {
       return this.handleClientUnsubscribe(payload, context)
     })
 
     // Set up heartbeat handler
-    this.adapter.on("$heartbeat", (payload, context) => {
+    this.transport.on("$heartbeat" as any, (payload, context) => {
       if (payload.clientId) {
         this.updateClientActivity(payload.clientId)
       }
@@ -178,7 +158,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     this.connectionIdToClientId.set(connectionId, clientId)
 
     // Emit connected event
-    await this.adapter.emit("$connected", {
+    await this.transport.emit("$connected" as any, {
       clientId,
       connectionId,
       timestamp: Date.now(),
@@ -218,7 +198,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     this.connectionIdToClientId.delete(connectionId)
 
     // Emit disconnected event
-    await this.adapter.emit("$disconnected", {
+    await this.transport.emit("$disconnected" as any, {
       clientId,
       connectionId,
       reason: "Client unregistered",
@@ -243,6 +223,23 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     const client = this.clients.get(clientId)
     if (!client) {
       throw new Error(`Client ${clientId} not found`)
+    }
+    
+    // Check authorization for each event
+    if (context.auth?.token && context.auth?.actor) {
+      for (const eventType of events) {
+        // Skip system events which start with $
+        if (!eventType.startsWith('$')) {
+          const canSubscribe = await this.authorizationProvider.canSubscribeToEvent(
+            context.auth.actor,
+            eventType
+          )
+          
+          if (!canSubscribe) {
+            throw new Error(`Unauthorized to subscribe to event: ${eventType}`)
+          }
+        }
+      }
     }
 
     // Generate a subscription ID
@@ -296,24 +293,18 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
   }
 
   /**
+   * Get access to the transport for use by methods in the example
+   */
+  get transportAdapter(): Transport<TContract> {
+    return this.transport
+  }
+
+  /**
    * Starts the server with the specified connection string.
-   * Connects the transport adapter and begins listening for client connections.
-   * Also starts the heartbeat monitor to track client health.
-   *
-   * @async
-   * @param {string} connectionString - The connection string where the server will listen
-   * @returns {Promise<void>} A promise that resolves when the server has started
-   * @throws {Error} If the server fails to start or the transport adapter cannot connect
-   * @example
-   * // Start server on an in-memory transport
-   * await server.start("memory://message-hub");
-   *
-   * // Start server on a WebSocket transport
-   * await server.start("ws://0.0.0.0:8080/messaging");
    */
   async start(connectionString: string): Promise<void> {
-    // Connect the transport adapter
-    await this.adapter.connect(connectionString)
+    // Connect the transport
+    await this.transport.connect(connectionString)
 
     // Start heartbeat
     this.startHeartbeat()
@@ -331,8 +322,8 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     // Disconnect all clients
     await this.disconnectAllClients("Server shutting down")
 
-    // Disconnect the transport adapter
-    await this.adapter.disconnect()
+    // Disconnect the transport
+    await this.transport.disconnect()
 
     console.log(`Server ${this.options.serverId} stopped`)
   }
@@ -363,7 +354,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
    */
   private async sendHeartbeat(): Promise<void> {
     try {
-      await this.adapter.emit("$heartbeat", {
+      await this.transport.emit("$heartbeat" as any, {
         timestamp: Date.now(),
         serverId: this.options.serverId,
       })
@@ -395,7 +386,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
         this.connectionIdToClientId.delete(client.connectionId)
 
         // Emit disconnected event
-        await this.adapter.emit("$disconnected", {
+        await this.transport.emit("$disconnected" as any, {
           clientId: client.clientId,
           connectionId: client.connectionId,
           reason: "Client timeout",
@@ -419,12 +410,12 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
 
     for (const client of this.clients.values()) {
       disconnectPromises.push(
-        this.adapter.emit("$disconnected", {
+        this.transport.emit("$disconnected" as any, {
           clientId: client.clientId,
           connectionId: client.connectionId,
           reason,
           timestamp: now,
-        }),
+        })
       )
     }
 
@@ -442,7 +433,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param data Optional data to include
    */
   async broadcast(message: string, data?: any): Promise<void> {
-    await this.adapter.emit("$broadcast", {
+    await this.transport.emit("$broadcast" as any, {
       message,
       data,
       timestamp: Date.now(),
@@ -455,7 +446,11 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param event The event type
    * @param payload The event payload
    */
-  async sendToClient<E extends string & keyof TEvents>(clientId: string, event: E, payload: any): Promise<void> {
+  async sendToClient<E extends keyof TContract["events"] & string>(
+    clientId: string, 
+    event: E, 
+    payload: InferEventData<TContract["events"], E>
+  ): Promise<void> {
     // Check if the client exists
     const client = this.clients.get(clientId)
     if (!client) {
@@ -470,7 +465,7 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
     }
 
     // Send the event
-    await this.adapter.emit(event, payload, context)
+    await this.transport.emit(event, payload, context)
   }
 
   /**
@@ -478,15 +473,19 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
    * @param requestType The request type
    * @param handler The request handler
    */
-  handleRequest<R extends string & keyof TRequests>(
+  handleRequest<R extends keyof TContract["requests"] & string>(
     requestType: R,
-    handler: (payload: any, context: MessageContext, clientId: string) => Promise<any>,
+    handler: (
+      payload: InferRequestData<TContract["requests"], R>, 
+      context: MessageContext, 
+      clientId: string
+    ) => Promise<InferResponseData<TContract["requests"], R>>,
   ): void {
     // Store the handler
-    this.requestHandlers.set(requestType, handler)
+    this.requestHandlers.set(requestType as string, handler as any)
 
     // Register with the adapter
-    this.adapter.handleRequest(requestType, async (payload, context) => {
+    this.transport.handleRequest(requestType, async (payload, context) => {
       // Get client ID from context
       const clientId = this.getClientIdFromContext(context)
       if (!clientId) {
@@ -496,6 +495,18 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
       // Check if client is registered
       if (!this.clients.has(clientId)) {
         throw new Error(`Client ${clientId} not registered`)
+      }
+      
+      // Check authorization
+      if (context.auth?.actor) {
+        const canAccess = await this.authorizationProvider.canAccessRequest(
+          context.auth.actor,
+          requestType
+        )
+        
+        if (!canAccess) {
+          throw new Error(`Unauthorized to access request: ${String(requestType)}`)
+        }
       }
 
       // Update client activity
@@ -562,5 +573,59 @@ export class Server<TEvents extends Record<string, any> = {}, TRequests extends 
       connectedClients: this.clients.size,
       capabilities: this.options.capabilities,
     }
+  }
+  
+  /**
+   * Get the authentication provider
+   */
+  getAuthProvider(): AuthProvider {
+    return this.authProvider
+  }
+  
+  /**
+   * Get the authorization provider
+   */
+  getAuthorizationProvider(): AuthorizationProvider<TContract> {
+    return this.authorizationProvider
+  }
+
+  /**
+   * Creates a default auth provider using the factory pattern
+   * @private
+   */
+  private createDefaultAuthProvider(): AuthProvider {
+    // Use the registry to create a default auth provider if available
+    if (AuthProviderRegistry.hasFactory("default")) {
+      return AuthProviderRegistry.createAuthProvider({
+        type: "default"
+      });
+    }
+
+    // Fallback for backward compatibility if registry isn't set up
+    // This will be removed in a future version
+    console.warn("Using deprecated auth provider creation. Please register a factory.");
+    const legacyProvider = require("./auth-provider").DefaultAuthProvider;
+    return new legacyProvider();
+  }
+
+  /**
+   * Creates a default authorization provider using the factory pattern
+   * @param contract The contract to use for authorization
+   * @private
+   */
+  private createDefaultAuthorizationProvider(contract: TContract): AuthorizationProvider<TContract> {
+    // Use the registry to create a default authorization provider if available
+    if (AuthorizationProviderRegistry.hasFactory("default")) {
+      return AuthorizationProviderRegistry.createAuthorizationProvider<TContract>({
+        type: "default",
+        contract
+      });
+    }
+
+    // Fallback for backward compatibility if registry isn't set up
+    // This will be removed in a future version
+    console.warn("Using deprecated authorization provider creation. Please register a factory.");
+    const legacyProvider = require("./authorization-provider").DefaultAuthorizationProvider;
+    return new legacyProvider(contract);
   }
 }

@@ -13,7 +13,7 @@ const transport = createTransportAdapter(new WebSocketTransport());
 
 // Initialize client
 const client = new Client(transport, {
-  clientId: 'my-client-id',
+  clientId: 'my-client-id',   
   clientType: 'frontend'
 });
 

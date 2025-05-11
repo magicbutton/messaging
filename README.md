@@ -28,13 +28,15 @@ A type-safe, domain-driven design framework for distributed systems communicatio
 ## Features
 
 - **Contract-First Design**: Define your communication contracts with Zod schemas for complete type safety
+- **Dependency Injection**: Inject contracts, transports, and providers for flexible architecture
 - **Pluggable Transport Layer**: Use built-in transports or create your own (HTTP, WebSockets, MQTT, etc.)
-- **Middleware Pipeline**: Insert middleware for logging, authentication, validation, and more
-- **Access Control**: Built-in role-based access control for secure communication
+- **Role-Based Access Control**: Strongly-typed role-based permissions for secure communication
+- **Authentication**: Pluggable authentication providers for flexible identity management
+- **Authorization**: Fine-grained access control with role inheritance and permissions
 - **Type Safety**: Full TypeScript support with inferred types from your Zod schemas
 - **Client/Server Architecture**: Dedicated client and server classes for easy implementation
 - **Event-Driven Communication**: Support for both request/response and event-based communication patterns
-- **Context Propagation**: Pass context information (auth, tracing, etc.) through your communication chain
+- **Error Handling**: Standardized error registry with severity levels and retry capabilities
 
 ## Installation
 
