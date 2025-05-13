@@ -1,4 +1,4 @@
-[**Magic Button Messaging v1.1.2**](../README.md)
+[**Magic Button Messaging v1.1.3**](../README.md)
 
 ***
 

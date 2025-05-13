@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.1.3] - 2025-05-13
+
+### Added
+- New features here
+
+### Changed
+- Changes here
+
+### Fixed
+- Bug fixes here
+
+## [1.1.2] - 2023-05-13
+
+### Added
+- Version management system with automated version bumping
+- Runtime version information and compatibility checking
+- Scripts for version bumping and compatible builds
+
+### Changed
+- Build process to support automatic version bumping
+- Library metadata now includes version information
+- Package scripts for version management
+
+### Fixed
+- No bug fixes in this release
+
 ## [1.1.1] - 2023-05-11
 
 ### Changed

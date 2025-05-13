@@ -120,6 +120,27 @@ export {
   SchemaVersion
 } from "./versioned-schema"
 
+// Version utilities and constants
+export { 
+  VERSION, 
+  LIBRARY_NAME, 
+  LIBRARY_DESCRIPTION,
+  FEATURES, 
+  COMPATIBILITY, 
+  DEFAULT_CONFIG 
+} from "./lib/constants"
+export {
+  getVersion,
+  getVersionInfo,
+  parseVersion,
+  compareVersions,
+  areVersionsCompatible,
+  meetsMinimumRequirements,
+  isDeprecated,
+  isUpdateRecommended,
+  getLibraryMetadata
+} from "./lib/version"
+
 // Testing utilities
 export {
   TestMessaging,

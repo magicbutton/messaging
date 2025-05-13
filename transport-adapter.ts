@@ -1,4 +1,7 @@
-import type { Transport, Contract, MessageContext, AuthResult } from "./types"
+import type { Contract, MessageContext, AuthResult } from "./types"
+import type { Transport } from "./types"
+
+export type { Transport }
 
 /**
  * Base abstract class for creating custom transport implementations

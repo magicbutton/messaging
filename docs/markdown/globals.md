@@ -1,8 +1,8 @@
-[**Magic Button Messaging v1.1.2**](README.md)
+[**Magic Button Messaging v1.1.3**](README.md)
 
 ***
 
-# Magic Button Messaging v1.1.2
+# Magic Button Messaging v1.1.3
 
 ## Enumerations
 
@@ -133,8 +133,19 @@
 - [SchemaType](type-aliases/SchemaType.md)
 - [Transport](type-aliases/Transport.md)
 
+## Variables
+
+- [COMPATIBILITY](variables/COMPATIBILITY.md)
+- [DEFAULT\_CONFIG](variables/DEFAULT_CONFIG.md)
+- [FEATURES](variables/FEATURES.md)
+- [LIBRARY\_DESCRIPTION](variables/LIBRARY_DESCRIPTION.md)
+- [LIBRARY\_NAME](variables/LIBRARY_NAME.md)
+- [VERSION](variables/VERSION.md)
+
 ## Functions
 
+- [areVersionsCompatible](functions/areVersionsCompatible.md)
+- [compareVersions](functions/compareVersions.md)
 - [createAccessControl](functions/createAccessControl.md)
 - [createAuthenticationMiddleware](functions/createAuthenticationMiddleware.md)
 - [createContract](functions/createContract.md)
@@ -149,8 +160,15 @@
 - [createTracedContext](functions/createTracedContext.md)
 - [createVersionedSchema](functions/createVersionedSchema.md)
 - [getLatestSchema](functions/getLatestSchema.md)
+- [getLibraryMetadata](functions/getLibraryMetadata.md)
 - [getObservabilityProvider](functions/getObservabilityProvider.md)
 - [getSchemaByVersion](functions/getSchemaByVersion.md)
+- [getVersion](functions/getVersion.md)
+- [getVersionInfo](functions/getVersionInfo.md)
 - [handleErrors](functions/handleErrors.md)
+- [isDeprecated](functions/isDeprecated.md)
+- [isUpdateRecommended](functions/isUpdateRecommended.md)
+- [meetsMinimumRequirements](functions/meetsMinimumRequirements.md)
+- [parseVersion](functions/parseVersion.md)
 - [retry](functions/retry.md)
 - [setObservabilityProvider](functions/setObservabilityProvider.md)
