@@ -5,7 +5,7 @@
 
 // Library version - DO NOT MODIFY MANUALLY
 // This is automatically updated by the version bumping script
-export const VERSION = '1.1.3';
+export const VERSION = '1.2.0';
 
 // Library information
 export const LIBRARY_NAME = '@magicbutton.cloud/messaging';

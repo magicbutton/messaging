@@ -1,4 +1,4 @@
-[**Magic Button Messaging v1.1.3**](../README.md)
+[**Magic Button Messaging v1.2.0**](../README.md)
 
 ***
 
@@ -33,6 +33,12 @@ Definition for a messaging contract
 `TPermissions` *extends* `Record`\<`string`, [`IPermissionDefinition`](IPermissionDefinition.md)\> = `Record`\<`string`, [`IPermissionDefinition`](IPermissionDefinition.md)\>
 
 ## Properties
+
+### description?
+
+> `optional` **description**: `string`
+
+***
 
 ### errors
 

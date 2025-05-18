@@ -46,11 +46,13 @@ export class MessagingClient<TContract extends Contract> {
       clientId: options.clientId || uuidv4(),
       clientType: options.clientType || "generic",
       autoReconnect: options.autoReconnect !== false,
+      reconnect: options.reconnect !== false,
       reconnectInterval: options.reconnectInterval || 5000,
       heartbeatInterval: options.heartbeatInterval || 30000,
       capabilities: options.capabilities || [],
       metadata: options.metadata || {},
-      authProvider: options.authProvider || this.createDefaultAuthProvider()
+      authProvider: options.authProvider || this.createDefaultAuthProvider(),
+      debug: options.debug || false
     }
 
     // Set up authentication provider
@@ -111,13 +113,15 @@ export class MessagingClient<TContract extends Contract> {
       // Restore subscriptions if any
       await this.restoreSubscriptions()
 
-      console.log(`Connected to server ${this.serverId} with connection ID ${this.connectionId}`)
+      if (this.options.debug) {
+        console.log(`Connected to server ${this.serverId} with connection ID ${this.connectionId}`)
+      }
     } catch (error) {
       this.setStatus(ClientStatus.ERROR)
       this.notifyErrorListeners(error instanceof Error ? error : new Error(String(error)))
 
       // Attempt to reconnect if enabled
-      if (this.options.autoReconnect) {
+      if (this.options.autoReconnect || this.options.reconnect) {
         this.scheduleReconnect()
       }
 
@@ -192,7 +196,7 @@ export class MessagingClient<TContract extends Contract> {
       // Check if we need to reconnect
       if (this.status === ClientStatus.CONNECTED) {
         this.setStatus(ClientStatus.ERROR)
-        if (this.options.autoReconnect) {
+        if (this.options.autoReconnect || this.options.reconnect) {
           this.scheduleReconnect()
         }
       }

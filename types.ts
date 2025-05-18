@@ -207,10 +207,12 @@ export const ClientOptionsSchema = z.object({
   clientId: z.string().optional(),
   clientType: z.string().optional(),
   autoReconnect: z.boolean().optional(),
+  reconnect: z.boolean().optional(), // Alias for autoReconnect
   reconnectInterval: z.number().optional(),
   heartbeatInterval: z.number().optional(),
   capabilities: z.array(z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  debug: z.boolean().optional(),
 })
 
 /**
@@ -220,11 +222,13 @@ export interface IClientOptions {
   clientId?: string
   clientType?: string
   autoReconnect?: boolean
+  reconnect?: boolean // Alias for autoReconnect
   reconnectInterval?: number
   heartbeatInterval?: number
   capabilities?: string[]
   metadata?: Record<string, unknown>
   authProvider?: IAuthProvider
+  debug?: boolean
 }
 
 /**
@@ -319,6 +323,7 @@ export interface IContract<
 > {
   name: string
   version: string
+  description?: string
   events: TEvents
   requests: TRequests
   errors: TErrors
@@ -332,6 +337,7 @@ export interface IContract<
 export const ContractSchema = z.object({
   name: z.string(),
   version: z.string(),
+  description: z.string().optional(),
   events: z.record(z.string(), z.union([
     z.instanceof(z.ZodType),
     z.object({

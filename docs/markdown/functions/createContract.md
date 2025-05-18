@@ -1,4 +1,4 @@
-[**Magic Button Messaging v1.1.3**](../README.md)
+[**Magic Button Messaging v1.2.0**](../README.md)
 
 ***
 
@@ -37,6 +37,12 @@ The type of error definitions
 
 The contract definition object
 
+#### description?
+
+`string`
+
+The description of the contract
+
 #### errors?
 
 `TErrors`
@@ -49,17 +55,33 @@ Error definitions for the contract
 
 Event schemas for the contract
 
+#### name?
+
+`string`
+
+The name of the contract
+
 #### requests
 
 `TRequests`
 
 Request schemas for the contract
 
+#### version?
+
+`string`
+
+The version of the contract
+
 ## Returns
 
 `object`
 
-- The complete contract with events, requests, and errors
+- The complete contract with name, version, events, requests, and errors
+
+### description?
+
+> `optional` **description**: `string`
 
 ### errors
 
@@ -69,14 +91,25 @@ Request schemas for the contract
 
 > **events**: `TEvents`
 
+### name
+
+> **name**: `string`
+
 ### requests
 
 > **requests**: `TRequests`
+
+### version
+
+> **version**: `string`
 
 ## Example
 
 ```typescript
 const userContract = createContract({
+  name: 'user-service',
+  version: '1.0.0',
+  description: 'User service contract',
   events: {
     userCreated: z.object({ id: z.string() }),
     userUpdated: z.object({ id: z.string(), changes: z.record(z.string()) })

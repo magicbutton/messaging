@@ -1,4 +1,4 @@
-[**Magic Button Messaging v1.1.3**](../README.md)
+[**Magic Button Messaging v1.2.0**](../README.md)
 
 ***
 
@@ -38,6 +38,12 @@ Client options interface
 
 ***
 
+### debug?
+
+> `optional` **debug**: `boolean`
+
+***
+
 ### heartbeatInterval?
 
 > `optional` **heartbeatInterval**: `number`
@@ -47,6 +53,12 @@ Client options interface
 ### metadata?
 
 > `optional` **metadata**: `Record`\<`string`, `unknown`\>
+
+***
+
+### reconnect?
+
+> `optional` **reconnect**: `boolean`
 
 ***
 

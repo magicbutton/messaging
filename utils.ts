@@ -106,14 +106,20 @@ export function createErrorMap<T extends Record<string, { code: string; message:
  * @template TRequests - The type of request schemas
  * @template TErrors - The type of error definitions
  * @param {Object} contract - The contract definition object
+ * @param {string} [contract.name] - The name of the contract
+ * @param {string} [contract.version] - The version of the contract
+ * @param {string} [contract.description] - The description of the contract
  * @param {TEvents} contract.events - Event schemas for the contract
  * @param {TRequests} contract.requests - Request schemas for the contract
  * @param {TErrors} [contract.errors] - Error definitions for the contract
- * @returns {Object} - The complete contract with events, requests, and errors
+ * @returns {Object} - The complete contract with name, version, events, requests, and errors
  *
  * @example
  * ```typescript
  * const userContract = createContract({
+ *   name: 'user-service',
+ *   version: '1.0.0',
+ *   description: 'User service contract',
  *   events: {
  *     userCreated: z.object({ id: z.string() }),
  *     userUpdated: z.object({ id: z.string(), changes: z.record(z.string()) })
@@ -135,15 +141,24 @@ export function createContract<
   TRequests extends RequestSchemas,
   TErrors extends Record<string, { code: string; message: string; status?: number }>,
 >(contract: {
+  name?: string
+  version?: string
+  description?: string
   events: TEvents
   requests: TRequests
   errors?: TErrors
 }): {
+  name: string
+  version: string
+  description?: string
   events: TEvents
   requests: TRequests
   errors: TErrors | Record<string, never>
 } {
   return {
+    name: contract.name || 'unnamed-contract',
+    version: contract.version || '1.0.0',
+    description: contract.description,
     events: contract.events,
     requests: contract.requests,
     errors: contract.errors || ({} as Record<string, never>),
